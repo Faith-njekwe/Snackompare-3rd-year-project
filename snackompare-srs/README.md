@@ -64,7 +64,7 @@ This SRS uses Times New Roman for all text, with 11 pt font for paragraphs and 1
 ### 1.3 Intended Audience and Reading Suggestions
 This Software Requirements Specification is intended for all stakeholders involved in the design, development, and evaluation of the SnacKompare mobile application, including developers, project supervisors, testers, and any future maintainers of the system. The document provides an overview of the application's purpose, major features, system constraints, and detailed functional and non-functional requirements. Readers should begin with the introductory sections to understand the vision and context of the product, then move to the functional requirements for insight into the application's behaviour, and finally consult the design constraints and technical specifications as needed for implementation or testing activities.
 
-### 1.4 Product Scope and Business Context
+### 1.4 Business Context
 The SnacKompare application is being developed as a third-year academic project within the School of Computing and is not sponsored by any external organization. The purpose of the system is educational—allowing the team to gain experience in mobile development, backend engineering, API integration, AI-assisted features, and full-stack application design. To keep the project affordable and sustainable for students, the system will rely on free or low-cost tools and APIs, such as OpenFoodFacts for nutritional data and limited-use LLM APIs for meal-plan generation. Should deployment be required for demonstration or testing, the team intends to use low-cost hosting options such as AWS Free Tier, Render, Railway, or Firebase, ensuring that operational costs remain minimal. Here are the apis and frameworks we plan on using:
 
 **React Native**: We plan to use an Expo-managed React Native setup for the frontend since we plan to build a mobile application, so we don't need to deal with native Android/iOS configuration that much.
@@ -120,10 +120,54 @@ Users may rely on the app to simplify decision-making around food choices. The p
 | Fitness and nutrition enthusiasts | More experienced users who engage with the app more frequently and expect detailed nutritional data, breakdowns, and advanced comparisons. While not the largest group, they are still important as they benefit from deeper insights and may use features such as AI-generated meal plans. | Medium |
 | Low digital literacy users | A less important user class, but are important to take into account during user testing. | Low |
 
-### 2.4 Operating Environment
-The application will operate as a mobile app built using React Native and will run on both Android and iOS devices. It will require a smartphone, preferably Android 8.0 or iOS 13 or later, to ensure compatibility with Expo-based components such as the barcode scanner. Camera functionality is necessary for barcode scanning, and an active internet connection is needed to communicate with the Django backend API and external services such as the OpenFoodFacts API and LLM providers. The backend will run on a server-hosted environment using Python, Django, and a PostgreSQL database.
+### 2.4 Operating Scenarios
 
-### 2.5 Design and Implementation Constraints
+
+#### Scenario 1 – Scanning a Food Item to View Nutritional Information
+
+- The user opens the SnacKompare mobile app.
+- The user selects the **Scan Barcode** option.
+- The camera activates, and the user scans the barcode on a food product.
+- The app sends the barcode to the Django REST API.
+- The backend queries the **OpenFoodFacts API** for the product’s nutritional data.
+- The backend cleans and structures the data, then returns it to the app.
+- The user sees the product’s nutritional profile (calories, sugar, fat, additives, etc.).
+
+#### Scenario 2 – Comparing a Food Item with Healthier Alternatives
+
+- The user views a scanned or searched food item.
+- The user taps **Compare**.
+- The app sends a request to the backend with the food item’s ID or nutrition profile.
+- The backend identifies alternatives based on scoring logic.
+- The system returns a ranked list of recommended alternatives.
+- The user can view each alternative, explore details, and save preferred items.
+
+#### Scenario 3 – Generating an AI-Based Weekly Meal Plan
+
+- The user goes to the **Meal Planner** section.
+- The backend constructs a structured prompt and sends it to the LLM API.
+- The LLM returns a 7-day meal plan with breakfast, lunch, dinner, and snacks.
+- The backend formats the meal plan and sends it to the app.
+- The user views the weekly plan and may tap **Shuffle** to regenerate certain meals.
+
+#### Scenario 4 – Saving Foods or Meal Plans to the User Profile
+
+- The user views a specific food item or weekly meal plan.
+- The user taps **Save**.
+- The app sends a save request to the backend.
+- The backend stores the item or meal plan in the PostgreSQL database under the user’s profile.
+- The system confirms the item has been saved.
+- The user can view saved items later from the **Favorites / Saved Plans** section.
+
+
+#### Scenario 5 – Offline or Poor Network Conditions
+
+- The user opens the app without a reliable internet connection.
+- The app warns the user that scanning, searching, and meal generation require internet access.
+- The user can still view previously saved foods and saved meal plans (locally cached).
+- Once a connection is restored, the app resumes normal functionality.
+
+#### 2.5 Design and Implementation Constraints
 
 | Constraint | Description | Impact |
 |------------|-------------|--------|
@@ -278,6 +322,8 @@ At a high level, the system includes:
 | External Services / 3rd Party Modules | 1. OpenFoodFacts API – Provides raw nutrition and product data for scanned or searched items. 2. Expo Barcode Scanner / react-native-camera – Enables barcode scanning via mobile device camera. 3. LLM API (OpenAI) – Generates personalised weekly meal plans based on user preferences, health goals, and dietary requirements. |
 
 ### 4.2 System Modules and Responsibilities
+
+*[ Refer to diagrams/System-Architecture.png]*
 
 #### 4.2.1 Front-End (React Native)
 Responsibilities:

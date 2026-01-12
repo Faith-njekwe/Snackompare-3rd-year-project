@@ -1,0 +1,1245 @@
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  SafeAreaView,
+  ScrollView,
+  View,
+  Text,
+  TouchableOpacity,
+  TextInput,
+  FlatList,
+  StyleSheet,
+  LayoutAnimation,
+  Platform,
+  UIManager,
+} from "react-native";
+import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
+import { ActivityIndicator, Modal } from "react-native";
+import { Camera, useCameraDevice, useCodeScanner } from "react-native-vision-camera";
+import { palette, shadows } from "./theme";
+
+const Stack = createNativeStackNavigator();
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE || "http://localhost:8000/api";
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+const mockProducts = [
+  {
+    id: "granola-001",
+    code: "000001",
+    barcode: "000001",
+    name: "Crunchy Granola",
+    brand: "GoodGrain",
+    category: "Breakfast",
+    nutriments: { energy: 420, fat: 12, saturatedFat: 2, carbs: 65, sugar: 18, protein: 9, fiber: 7, salt: 0.6 },
+  },
+  {
+    id: "yogurt-002",
+    code: "000002",
+    barcode: "000002",
+    name: "Greek Yogurt (Low Fat)",
+    brand: "CreamCo",
+    category: "Dairy",
+    nutriments: { energy: 95, fat: 2, saturatedFat: 1, carbs: 6, sugar: 5, protein: 10, fiber: 0, salt: 0.2 },
+  },
+  {
+    id: "choc-003",
+    code: "000003",
+    barcode: "000003",
+    name: "Milk Chocolate Bar",
+    brand: "ChocoBite",
+    category: "Snacks",
+    nutriments: { energy: 540, fat: 32, saturatedFat: 20, carbs: 55, sugar: 50, protein: 6, fiber: 2, salt: 0.3 },
+  },
+  {
+    id: "chips-004",
+    code: "000004",
+    barcode: "000004",
+    name: "Sea Salt Crisps",
+    brand: "Crunchies",
+    category: "Snacks",
+    nutriments: { energy: 510, fat: 32, saturatedFat: 3, carbs: 50, sugar: 1, protein: 6, fiber: 4, salt: 1.3 },
+  },
+  {
+    id: "apple-005",
+    code: "000005",
+    barcode: "000005",
+    name: "Apple Slices",
+    brand: "FreshFields",
+    category: "Fruit",
+    nutriments: { energy: 52, fat: 0.2, saturatedFat: 0, carbs: 14, sugar: 10, protein: 0.3, fiber: 2.4, salt: 0 },
+  },
+  {
+    id: "bar-006",
+    code: "000006",
+    barcode: "000006",
+    name: "Protein Bar (Salted Caramel)",
+    brand: "FuelUp",
+    category: "Snacks",
+    nutriments: { energy: 210, fat: 6, saturatedFat: 2, carbs: 18, sugar: 6, protein: 20, fiber: 8, salt: 0.5 },
+  },
+];
+
+function scoreProduct(nutrition, dietFlags = {}) {
+  if (!nutrition) return { score: 0, label: "Unknown" };
+  const limits = {
+    sugar: dietFlags.lowSugar ? 15 : 25,
+    salt: dietFlags.lowSalt ? 0.8 : 1.2,
+  };
+  const penalties =
+    Math.max(0, (nutrition.sugar || 0) - limits.sugar) * 1.1 +
+    Math.max(0, (nutrition.salt || 0) - limits.salt) * 10 +
+    (nutrition.saturatedFat || 0) * 0.8;
+  const boosts = (nutrition.fiber || 0) * 2 + (nutrition.protein || 0) * 0.6;
+  const score = Math.max(10, Math.min(100, Math.round(80 + boosts - penalties)));
+  let label = "Balanced";
+  if (score >= 85) label = "Great";
+  else if (score >= 70) label = "Better";
+  else if (score <= 40) label = "Limit";
+  return { score, label };
+}
+
+function formatNumber(value, suffix = "") {
+  if (value === undefined || value === null) return "N/A";
+  return `${value}${suffix}`;
+}
+
+function dayName(index) {
+  const names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  return names[index] || `Day ${index + 1}`;
+}
+
+async function safeGet(path, params = {}, token = "") {
+  try {
+    const res = await axios.get(`${API_BASE}${path}`, {
+      params,
+      timeout: 10000,
+      headers: token ? { Authorization: `Token ${token}` } : {},
+    });
+    return res.data;
+  } catch (err) {
+    console.log("GET failed", path, err.message);
+    throw err;
+  }
+}
+
+async function safePost(path, body = {}, token = "") {
+  try {
+    const res = await axios.post(`${API_BASE}${path}`, body, {
+      timeout: 15000,
+      headers: token ? { Authorization: `Token ${token}` } : {},
+    });
+    return res.data;
+  } catch (err) {
+    console.log("POST failed", path, err.message);
+    throw err;
+  }
+}
+
+async function safeDelete(path, body = {}, token = "") {
+  try {
+    const res = await axios.delete(`${API_BASE}${path}`, {
+      data: body,
+      timeout: 10000,
+      headers: token ? { Authorization: `Token ${token}` } : {},
+    });
+    return res.data;
+  } catch (err) {
+    console.log("DELETE failed", path, err.message);
+    throw err;
+  }
+}
+
+function VisionCameraScanner({ onBarcodeScanned }) {
+  const device = useCameraDevice('back');
+  const [isActive, setIsActive] = useState(true);
+
+  const codeScanner = useCodeScanner({
+    codeTypes: ['qr', 'ean-13', 'ean-8', 'code-128', 'code-39', 'upc-a', 'upc-e'],
+    onCodeScanned: (codes) => {
+      if (codes.length > 0 && isActive) {
+        const code = codes[0];
+        if (code.value) {
+          setIsActive(false);
+          onBarcodeScanned(code.value);
+          setTimeout(() => setIsActive(true), 2000);
+        }
+      }
+    },
+  });
+
+  if (!device) {
+    return (
+      <View style={styles.placeholder}>
+        <Text style={styles.muted}>No camera device found</Text>
+      </View>
+    );
+  }
+
+  return (
+    <Camera
+      style={StyleSheet.absoluteFillObject}
+      device={device}
+      isActive={isActive}
+      codeScanner={codeScanner}
+    />
+  );
+}
+
+export default function App() {
+  const [hasPermission, setHasPermission] = useState(null);
+  const [scanResult, setScanResult] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState(mockProducts);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [mealLoading, setMealLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [compareSelection, setCompareSelection] = useState({ left: mockProducts[0], right: mockProducts[1] });
+  const [favourites, setFavourites] = useState([mockProducts[1], mockProducts[5]]);
+  const [recentScans, setRecentScans] = useState([]);
+  const [profile, setProfile] = useState({
+    userId: "demo-user",
+    name: "Taylor",
+    goal: "Lean & balanced",
+    diet: "No preference",
+    allergens: "None",
+    calorie_target: 2200,
+  });
+  const [dietaryFilter, setDietaryFilter] = useState({
+    diet: "any",
+    lowSugar: false,
+    lowSalt: false,
+    glutenFree: false,
+  });
+  const [recentSearches, setRecentSearches] = useState([]);
+  const [mealPlan, setMealPlan] = useState([]);
+  const [statusNote, setStatusNote] = useState("Mocked data is available for offline demo.");
+  const [offlineSaved, setOfflineSaved] = useState(false);
+  const [pendingOps, setPendingOps] = useState([]);
+  const [explanation, setExplanation] = useState("");
+  const [token, setToken] = useState("");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [sheetVisible, setSheetVisible] = useState({ left: false, right: false });
+
+  useEffect(() => {
+    Camera.requestCameraPermission().then((status) => setHasPermission(status === "granted"));
+    loadStored();
+  }, []);
+
+  async function loadStored() {
+    const [storedProfile, storedFavs, storedOps, storedRecents, storedSearches, storedToken] = await Promise.all([
+      AsyncStorage.getItem("profile"),
+      AsyncStorage.getItem("favourites"),
+      AsyncStorage.getItem("pendingOps"),
+      AsyncStorage.getItem("recentScans"),
+      AsyncStorage.getItem("recentSearches"),
+      AsyncStorage.getItem("token"),
+    ]);
+    if (storedProfile) setProfile(JSON.parse(storedProfile));
+    if (storedFavs) setFavourites(JSON.parse(storedFavs));
+    if (storedOps) setPendingOps(JSON.parse(storedOps));
+    if (storedRecents) setRecentScans(JSON.parse(storedRecents));
+    if (storedSearches) setRecentSearches(JSON.parse(storedSearches));
+    if (storedToken) setToken(storedToken);
+    setOfflineSaved(!!storedFavs || !!storedProfile);
+    flushPendingOps();
+  }
+
+  async function flushPendingOps() {
+    if (!pendingOps.length) return;
+    const remaining = [];
+    for (const op of pendingOps) {
+      try {
+        if (op.type === "favourite" && op.action === "add") {
+          await safePost("/favourites/", { user_id: profile.userId, code: op.code }, token);
+        }
+        if (op.type === "favourite" && op.action === "remove") {
+          await safeDelete("/favourites/", { user_id: profile.userId, code: op.code }, token);
+        }
+      } catch {
+        remaining.push(op);
+      }
+    }
+    setPendingOps(remaining);
+    await AsyncStorage.setItem("pendingOps", JSON.stringify(remaining));
+    setOfflineSaved(!!remaining.length);
+  }
+
+  async function queueOp(op) {
+    const next = [...pendingOps, op];
+    setPendingOps(next);
+    setOfflineSaved(true);
+    await AsyncStorage.setItem("pendingOps", JSON.stringify(next));
+  }
+
+  async function registerUser() {
+    setErrorMessage("");
+    try {
+      const data = await safePost("/auth/register/", { email: authEmail, password: authPassword });
+      if (data?.token) {
+        setToken(data.token);
+        await AsyncStorage.setItem("token", data.token);
+        setStatusNote("Registered and signed in.");
+      }
+    } catch (err) {
+      setErrorMessage("Registration failed (user may exist).");
+    }
+  }
+
+  async function loginUser() {
+    setErrorMessage("");
+    try {
+      const data = await safePost("/auth/login/", { email: authEmail, password: authPassword });
+      if (data?.token) {
+        setToken(data.token);
+        await AsyncStorage.setItem("token", data.token);
+        setStatusNote("Signed in.");
+      }
+    } catch (err) {
+      setErrorMessage("Login failed; check credentials.");
+    }
+  }
+
+  async function persistProfile(next) {
+    setProfile(next);
+    await AsyncStorage.setItem("profile", JSON.stringify(next));
+  }
+
+  async function persistFavourites(next) {
+    setFavourites(next);
+    await AsyncStorage.setItem("favourites", JSON.stringify(next));
+  }
+
+  const comparisonRows = useMemo(() => {
+    const { left, right } = compareSelection;
+    if (!left || !right) return [];
+    const compareKeys = [
+      ["Energy (kcal)", "energy"],
+      ["Fat (g)", "fat"],
+      ["Saturated Fat (g)", "saturatedFat"],
+      ["Carbohydrates (g)", "carbs"],
+      ["Sugars (g)", "sugar"],
+      ["Protein (g)", "protein"],
+      ["Fiber (g)", "fiber"],
+      ["Salt (g)", "salt"],
+    ];
+    return compareKeys.map(([label, key]) => ({
+      label,
+      left: left.nutriments[key],
+      right: right.nutriments[key],
+    }));
+  }, [compareSelection]);
+
+  const alternatives = useMemo(() => {
+    if (!scanResult) return [];
+    const baseScore = scoreProduct(scanResult.nutriments, dietaryFilter).score;
+    return searchResults
+      .filter((p) => p.code !== scanResult.code)
+      .map((p) => ({ ...p, score: scoreProduct(p.nutriments, dietaryFilter).score }))
+      .filter((p) => {
+        if (dietaryFilter.diet === "vegan" && (p.additives || []).some((a) => a.includes("non-vegan"))) return false;
+        if (dietaryFilter.diet === "vegetarian" && (p.additives || []).some((a) => a.includes("non-vegetarian")))
+          return false;
+        if (dietaryFilter.glutenFree && (p.allergens || []).some((a) => a.includes("gluten"))) return false;
+        return p.score >= baseScore;
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+  }, [scanResult, searchResults]);
+
+  function hydrateProduct(p) {
+    // Normalise data shape from backend responses or mock
+    return {
+      id: p.id || p.code,
+      code: p.code || p.barcode || p.id,
+      name: p.name || p.product_name,
+      brand: p.brand || p.brands || "",
+      category: p.category || p.categories || "",
+      nutriments: p.nutriments || p.nutrition || {},
+    };
+  }
+
+  async function handleSearch(customTerm) {
+    setErrorMessage("");
+    setSearchLoading(true);
+    const term = customTerm !== undefined ? customTerm : searchQuery.trim();
+    setSearchQuery(term);
+    addRecentSearch(term);
+    if (!term) {
+      setSearchResults(mockProducts);
+      setStatusNote("Showing mocked catalog. Enter a term to search OpenFoodFacts via backend.");
+      setSearchLoading(false);
+      return;
+    }
+    try {
+      const params = {
+        query: term,
+        page: 1,
+        page_size: 12,
+        diet: dietaryFilter.diet !== "any" ? dietaryFilter.diet : undefined,
+        exclude_allergens: dietaryFilter.glutenFree ? ["en:gluten"] : undefined,
+      };
+      const data = await safeGet("/search/", params, token);
+      if (data?.results?.length) {
+        const cleaned = data.results.map(hydrateProduct);
+        setSearchResults(cleaned);
+        setStatusNote(`Found ${cleaned.length} items via backend.`);
+      } else {
+        setStatusNote("No results from backend; showing mock filter.");
+        const filtered = mockProducts.filter(
+          (p) =>
+            p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            p.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            p.category.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        setSearchResults(filtered);
+      }
+    } catch (err) {
+      setErrorMessage("Search failed (network/rate limit). Showing mock results.");
+      const filtered = mockProducts.filter(
+        (p) =>
+          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.category.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setSearchResults(filtered);
+    } finally {
+      setSearchLoading(false);
+    }
+  }
+
+  async function fetchBarcode(barcode) {
+    setErrorMessage("");
+    setScanLoading(true);
+    try {
+      const data = await safeGet(`/barcode/${barcode}/`);
+      if (data?.code) {
+        const product = hydrateProduct(data);
+        setScanResult(product);
+        setCompareSelection((prev) => ({ ...prev, left: product }));
+        setStatusNote(`Fetched ${product.name} from backend.`);
+        addRecentScan(product);
+      } else {
+        throw new Error("Not found");
+      }
+    } catch (err) {
+      setStatusNote("Barcode lookup failed; trying mock list.");
+      const found = mockProducts.find((p) => p.barcode === barcode);
+      if (found) {
+        setScanResult(found);
+        setCompareSelection((prev) => ({ ...prev, left: found }));
+        setStatusNote("Found in mock catalog.");
+        addRecentScan(found);
+      } else {
+        setErrorMessage("Barcode not recognised online or offline.");
+      }
+    } finally {
+      setScanLoading(false);
+    }
+  }
+
+  async function toggleFavorite(product) {
+    const exists = favourites.find((f) => f.code === product.code || f.id === product.id);
+    if (exists) {
+      const next = favourites.filter((f) => f.code !== product.code && f.id !== product.id);
+      await persistFavourites(next);
+      try {
+        await safeDelete("/favourites/", { user_id: profile.userId, code: product.code }, token);
+        setOfflineSaved(false);
+      } catch {
+        await queueOp({ type: "favourite", action: "remove", code: product.code });
+      }
+    } else {
+      const next = [...favourites, product];
+      await persistFavourites(next);
+      try {
+        await safePost("/favourites/", { user_id: profile.userId, code: product.code }, token);
+        setOfflineSaved(false);
+      } catch {
+        await queueOp({ type: "favourite", action: "add", code: product.code });
+      }
+    }
+  }
+
+  async function buildMealPlan() {
+    setMealLoading(true);
+    setErrorMessage("");
+    try {
+      const data = await safePost("/meal-plan/", {
+        user_id: profile.userId,
+        profile,
+        favourites,
+      }, token);
+      if (data?.plan?.structured) {
+        setMealPlan(data.plan.structured);
+        setStatusNote("Meal plan generated from backend (LLM fallback if key missing).");
+      } else {
+        throw new Error("No plan returned");
+      }
+    } catch (err) {
+      const picks = [...favourites, ...mockProducts];
+      const plan = Array.from({ length: 7 }).map((_, i) => ({
+        day: dayName(i),
+        breakfast: picks[(i + 1) % picks.length].name,
+        lunch: "Lean chicken salad",
+        dinner: "Grilled salmon + greens",
+        snack: "Greek yogurt + berries",
+      }));
+      setMealPlan(plan);
+      setStatusNote("Local meal plan generated (offline).");
+      setErrorMessage("Meal plan service offline; using local fallback.");
+    } finally {
+      setMealLoading(false);
+    }
+  }
+
+  async function buildExplanation() {
+    setErrorMessage("");
+    if (!compareSelection.left || !compareSelection.right) {
+      setErrorMessage("Select two products before asking the assistant.");
+      return;
+    }
+    try {
+      const data = await safePost("/explain/", {
+        base: compareSelection.left,
+        alternative: compareSelection.right,
+        profile,
+      }, token);
+      if (data?.explanation) {
+        setExplanation(data.explanation);
+        setStatusNote("AI explanation ready.");
+      }
+    } catch (err) {
+      setErrorMessage("Assistant unavailable; add OpenAI key or retry later.");
+    }
+  }
+
+  function addRecentScan(product) {
+    const exists = recentScans.find((p) => p.code === product.code);
+    const next = exists ? recentScans : [product, ...recentScans].slice(0, 8);
+    setRecentScans(next);
+    AsyncStorage.setItem("recentScans", JSON.stringify(next));
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  }
+
+  function addRecentSearch(term) {
+    if (!term) return;
+    const exists = recentSearches.find((t) => t.toLowerCase() === term.toLowerCase());
+    const next = exists ? recentSearches : [term, ...recentSearches].slice(0, 8);
+    setRecentSearches(next);
+    AsyncStorage.setItem("recentSearches", JSON.stringify(next));
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  }
+
+  const ProductCard = ({ product, actions }) => {
+    const { score, label } = scoreProduct(product.nutriments, dietaryFilter);
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View>
+            <Text style={styles.eyebrow}>{product.category}</Text>
+            <Text style={styles.cardTitle}>{product.name}</Text>
+            <Text style={styles.muted}>{product.brand}</Text>
+            {product.ecoscore ? <Text style={styles.muted}>Eco-score: {product.ecoscore}</Text> : null}
+            {product.allergens?.length ? (
+              <Text style={styles.warning}>Allergens: {product.allergens.join(", ").replace("en:", "")}</Text>
+            ) : null}
+            {product.additives?.length ? (
+              <Text style={styles.warning}>Additives: {product.additives.join(", ").replace("en:", "")}</Text>
+            ) : null}
+            {product.ingredients ? (
+              <Text style={styles.muted}>
+                Ingredients: {String(product.ingredients).slice(0, 80)}
+                {String(product.ingredients).length > 80 ? "..." : ""}
+              </Text>
+            ) : null}
+          </View>
+          <View style={styles.pill}>
+            <Text style={styles.pillScore}>{score}</Text>
+            <Text style={styles.pillLabel}>{label}</Text>
+          </View>
+        </View>
+        <View style={styles.nutritionGrid}>
+          <Text>Energy</Text>
+          <Text>{formatNumber(product.nutriments.energy, " kcal")}</Text>
+          <Text>Fat</Text>
+          <Text>{formatNumber(product.nutriments.fat, " g")}</Text>
+          <Text>Saturated</Text>
+          <Text>{formatNumber(product.nutriments.saturatedFat, " g")}</Text>
+          <Text>Carbs</Text>
+          <Text>{formatNumber(product.nutriments.carbs, " g")}</Text>
+          <Text>Sugars</Text>
+          <Text>{formatNumber(product.nutriments.sugar, " g")}</Text>
+          <Text>Protein</Text>
+          <Text>{formatNumber(product.nutriments.protein, " g")}</Text>
+          <Text>Fiber</Text>
+          <Text>{formatNumber(product.nutriments.fiber, " g")}</Text>
+          <Text>Salt</Text>
+          <Text>{formatNumber(product.nutriments.salt, " g")}</Text>
+        </View>
+        {actions}
+      </View>
+  );
+};
+
+const PickerSection = ({ title, items, onPick, activeId }) => {
+  const unique = items.filter(
+    (p, idx, arr) => p && p.code && arr.findIndex((x) => x.code === p.code) === idx
+  );
+  return (
+    <View style={styles.panel}>
+      <Text style={styles.muted}>{title}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+        {unique.map((p) => (
+          <TouchableOpacity
+            key={p.code}
+            style={[
+              styles.pickerChip,
+              activeId === p.code && styles.pickerChipActive,
+            ]}
+            onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              onPick(p);
+            }}
+          >
+            <Text style={activeId === p.code ? styles.pickerTextActive : styles.pickerText}>
+              {p.name}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+};
+
+const SkeletonCard = () => (
+  <View style={[styles.card, { opacity: 0.6 }]}>
+    <View style={[styles.skeleton, { width: "60%" }]} />
+    <View style={[styles.skeleton, { width: "40%", marginTop: 6 }]} />
+    <View style={[styles.skeleton, { width: "80%", marginTop: 12 }]} />
+    <View style={[styles.skeleton, { width: "90%", marginTop: 6 }]} />
+    <View style={[styles.skeleton, { width: "70%", marginTop: 6 }]} />
+  </View>
+);
+
+const ProductSheet = ({ visible, onClose, onPick, items, title }) => {
+  const unique = items.filter(
+    (p, idx, arr) => p && p.code && arr.findIndex((x) => x.code === p.code) === idx
+  );
+  return (
+    <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
+      <View style={styles.sheetBackdrop}>
+        <TouchableOpacity style={{ flex: 1 }} onPress={onClose} />
+        <View style={styles.sheet}>
+          <Text style={styles.panelTitle}>{title}</Text>
+          <ScrollView>
+            {unique.map((p) => (
+              <TouchableOpacity
+                key={p.code}
+                style={styles.sheetItem}
+                onPress={() => {
+                  onPick(p);
+                  onClose();
+                }}
+              >
+                <Text style={styles.cardTitle}>{p.name}</Text>
+                <Text style={styles.muted}>{p.brand}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <TouchableOpacity style={styles.ghost} onPress={onClose}>
+            <Text style={styles.ghostText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+  const HomeScreen = ({ navigation }) => (
+    <ScrollView style={styles.screen}>
+      <View style={styles.hero}>
+        <View>
+          <Text style={styles.eyebrow}>Today</Text>
+          <Text style={styles.heroTitle}>{profile.goal}</Text>
+          <Text style={styles.muted}>Goal, diet and favourites shape alternatives and plans.</Text>
+        </View>
+        <TouchableOpacity style={styles.ghost} onPress={() => navigation.navigate("Meals")}>
+          <Text style={styles.ghostText}>View plan</Text>
+        </TouchableOpacity>
+      </View>
+      {offlineSaved && <Text style={styles.offlineBadge}>Saved offline</Text>}
+      {statusNote ? <Text style={styles.banner}>{statusNote}</Text> : null}
+      <View style={styles.panel}>
+        <Text style={styles.panelTitle}>Quick actions</Text>
+        <View style={styles.row}>
+          <TouchableOpacity style={styles.primary} onPress={() => navigation.navigate("Scan")}>
+            <Text style={styles.primaryText}>Scan barcode</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondary} onPress={() => navigation.navigate("Search")}>
+            <Text style={styles.secondaryText}>Search catalog</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.ghost} onPress={() => navigation.navigate("Profile")}>
+            <Text style={styles.ghostText}>Profile</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+      {favourites[0] && (
+        <View style={styles.panel}>
+          <Text style={styles.panelTitle}>Favourite highlight</Text>
+          <ProductCard product={favourites[0]} />
+        </View>
+      )}
+    </ScrollView>
+  );
+
+  const ScanScreen = ({ navigation }) => {
+    const [manualCode, setManualCode] = useState("");
+    return (
+      <ScrollView style={styles.screen}>
+        <View style={styles.panelHeader}>
+          <View>
+            <Text style={styles.eyebrow}>Barcode scanner</Text>
+            <Text style={styles.panelTitle}>Scan or type a code</Text>
+            <Text style={styles.muted}>
+              Camera permissions are needed. Simulate scan to demo without hardware.
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.primary} onPress={() => fetchBarcode(manualCode || "000001")}>
+            <Text style={styles.primaryText}>Submit</Text>
+          </TouchableOpacity>
+        </View>
+        {hasPermission ? (
+          <View style={styles.scannerBox}>
+            <VisionCameraScanner onBarcodeScanned={(data) => fetchBarcode(data)} />
+          </View>
+        ) : (
+          <View style={styles.placeholder}>
+            <Text style={styles.muted}>Camera not available. Use simulate or manual entry.</Text>
+            {!hasPermission && (
+              <TouchableOpacity
+                style={styles.secondary}
+                onPress={async () => {
+                  const status = await Camera.requestCameraPermission();
+                  setHasPermission(status === "granted");
+                }}
+              >
+                <Text style={styles.secondaryText}>Request permission</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+        {scanLoading && (
+          <View style={styles.placeholder}>
+            <ActivityIndicator size="small" color="#3b82f6" />
+            <Text style={styles.muted}>Looking up barcode...</Text>
+          </View>
+        )}
+        {scanResult && !scanLoading ? (
+          <ProductCard
+            product={scanResult}
+            actions={
+              <View style={styles.row}>
+                <TouchableOpacity style={styles.secondary} onPress={() => toggleFavorite(scanResult)}>
+                  <Text style={styles.secondaryText}>
+                    {favourites.find((f) => f.code === scanResult.code) ? "Unsave" : "Save favourite"}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.ghost}
+                  onPress={() => {
+                    setCompareSelection((prev) => ({ ...prev, left: scanResult }));
+                    navigation.navigate("Compare");
+                  }}
+                >
+                  <Text style={styles.ghostText}>Compare</Text>
+                </TouchableOpacity>
+              </View>
+            }
+          />
+        ) : (
+          <View style={styles.placeholder}>
+            <Text style={styles.muted}>No scan yet. Point at a barcode or type one.</Text>
+            <TouchableOpacity style={styles.primary} onPress={() => fetchBarcode("000001")}>
+              <Text style={styles.primaryText}>Simulate scan</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+        <TextInput
+          style={[styles.input, { marginTop: 12 }]}
+          placeholder="Type barcode manually"
+          value={manualCode}
+          onChangeText={setManualCode}
+        />
+        {alternatives.length ? (
+          <View style={styles.panel}>
+            <Text style={styles.panelTitle}>Alternatives</Text>
+            <View style={styles.altGrid}>
+              {alternatives.map((p) => (
+                <View key={p.id || p.code} style={styles.altCard}>
+                  <Text style={styles.cardTitle}>{p.name}</Text>
+                  <Text style={styles.muted}>{p.brand}</Text>
+                  <View style={styles.pillSmall}>
+                    <Text style={styles.pillScore}>{p.score}</Text>
+                    <Text style={styles.pillLabel}>Score</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.ghost}
+                    onPress={() => {
+                      setCompareSelection((prev) => ({ ...prev, right: p }));
+                      navigation.navigate("Compare");
+                    }}
+                  >
+                    <Text style={styles.ghostText}>Compare</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+      </ScrollView>
+    );
+  };
+
+  const SearchScreen = ({ navigation }) => (
+    <ScrollView style={styles.screen}>
+      <View style={styles.searchRow}>
+        <TextInput
+          style={styles.input}
+          placeholder="Search by name, brand, or category"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        <TouchableOpacity style={styles.primary} onPress={handleSearch}>
+          <Text style={styles.primaryText}>Search</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.chipRow}>
+        {["any", "vegan", "vegetarian"].map((opt) => (
+          <TouchableOpacity
+            key={opt}
+            style={[styles.chip, dietaryFilter.diet === opt && styles.chipActive]}
+            onPress={() => setDietaryFilter({ ...dietaryFilter, diet: opt })}
+          >
+            <Text style={dietaryFilter.diet === opt ? styles.chipTextActive : styles.chipText}>
+              {opt}
+            </Text>
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity
+          style={[styles.chip, dietaryFilter.lowSugar && styles.chipActive]}
+          onPress={() => setDietaryFilter({ ...dietaryFilter, lowSugar: !dietaryFilter.lowSugar })}
+        >
+          <Text style={dietaryFilter.lowSugar ? styles.chipTextActive : styles.chipText}>Low sugar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.chip, dietaryFilter.lowSalt && styles.chipActive]}
+          onPress={() => setDietaryFilter({ ...dietaryFilter, lowSalt: !dietaryFilter.lowSalt })}
+        >
+          <Text style={dietaryFilter.lowSalt ? styles.chipTextActive : styles.chipText}>Low salt</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.chip, dietaryFilter.glutenFree && styles.chipActive]}
+          onPress={() => setDietaryFilter({ ...dietaryFilter, glutenFree: !dietaryFilter.glutenFree })}
+        >
+          <Text style={dietaryFilter.glutenFree ? styles.chipTextActive : styles.chipText}>Gluten-free</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.chipRow}>
+        {recentSearches.map((term) => (
+          <TouchableOpacity
+            key={term}
+            style={styles.chip}
+            onPress={() => {
+                handleSearch(term);
+            }}
+          >
+            <Text style={styles.chipText}>{term}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {searchLoading && (
+        <View>
+          <View style={styles.placeholder}>
+            <ActivityIndicator size="small" color="#3b82f6" />
+            <Text style={styles.muted}>Searching...</Text>
+          </View>
+          <SkeletonCard />
+          <SkeletonCard />
+        </View>
+      )}
+      {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+      <FlatList
+        data={searchResults}
+        keyExtractor={(item) => item.id || item.code}
+        ItemSeparatorComponent={() => <View style={styles.spacer} />}
+        renderItem={({ item }) => (
+          <ProductCard
+            product={item}
+            actions={
+              <View style={styles.row}>
+                <TouchableOpacity style={styles.secondary} onPress={() => toggleFavorite(item)}>
+                  <Text style={styles.secondaryText}>
+                    {favourites.find((f) => f.code === item.code || f.id === item.id) ? "Unsave" : "Save favourite"}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.ghost}
+                  onPress={() => {
+                    setCompareSelection((prev) => ({ ...prev, right: item }));
+                    navigation.navigate("Compare");
+                  }}
+                >
+                  <Text style={styles.ghostText}>Compare</Text>
+                </TouchableOpacity>
+              </View>
+            }
+          />
+        )}
+        ListEmptyComponent={
+          <View style={styles.placeholder}>
+            <Text style={styles.muted}>No products found.</Text>
+          </View>
+        }
+      />
+    </ScrollView>
+  );
+
+  const CompareScreen = () => (
+    <ScrollView style={styles.screen}>
+      <Text style={styles.panelTitle}>Two-way nutrition view</Text>
+      <PickerSection
+        title="Product 1"
+        items={[...recentScans, ...favourites, ...searchResults]}
+        onPick={(p) => setCompareSelection((prev) => ({ ...prev, left: p }))}
+        activeId={compareSelection.left?.code}
+      />
+      <PickerSection
+        title="Product 2"
+        items={[...recentScans, ...favourites, ...searchResults]}
+        onPick={(p) => setCompareSelection((prev) => ({ ...prev, right: p }))}
+        activeId={compareSelection.right?.code}
+      />
+      <View style={styles.row}>
+        <TouchableOpacity style={styles.primary} onPress={() => setSheetVisible({ left: true, right: false })}>
+          <Text style={styles.primaryText}>Open picker 1</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.secondary} onPress={() => setSheetVisible({ left: false, right: true })}>
+          <Text style={styles.secondaryText}>Open picker 2</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.tableHead}>
+        <Text style={styles.tableLabel}>Nutrient</Text>
+        <Text style={styles.tableLabel}>{compareSelection.left?.name || "Product 1"}</Text>
+        <Text style={styles.tableLabel}>{compareSelection.right?.name || "Product 2"}</Text>
+      </View>
+      {comparisonRows.map((row) => (
+        <View key={row.label} style={styles.tableRow}>
+          <Text style={styles.tableCell}>{row.label}</Text>
+          <Text style={styles.tableCell}>{formatNumber(row.left, " g")}</Text>
+          <Text style={styles.tableCell}>{formatNumber(row.right, " g")}</Text>
+        </View>
+      ))}
+      <View style={[styles.panel, { marginTop: 10 }]}>
+        <Text style={styles.eyebrow}>Delta (alt - base)</Text>
+        {comparisonRows.map((row) => {
+          const delta = (row.right || 0) - (row.left || 0);
+          return (
+            <Text key={row.label} style={styles.muted}>
+              {row.label}: {delta > 0 ? "+" : ""}
+              {isNaN(delta) ? "N/A" : delta.toFixed(2)}
+            </Text>
+          );
+        })}
+        <Text style={styles.muted}>
+          Score delta: {scoreProduct(compareSelection.right?.nutriments || {}).score -
+            scoreProduct(compareSelection.left?.nutriments || {}).score}
+        </Text>
+      </View>
+      <TouchableOpacity style={[styles.primary, { marginTop: 12 }]} onPress={() => buildExplanation()}>
+        <Text style={styles.primaryText}>Ask AI: Why is right healthier?</Text>
+      </TouchableOpacity>
+      {explanation ? <Text style={styles.banner}>{explanation}</Text> : null}
+      {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+      <ProductSheet
+        visible={sheetVisible.left}
+        title="Pick Product 1"
+        items={[...recentScans, ...favourites, ...searchResults]}
+        onPick={(p) => setCompareSelection((prev) => ({ ...prev, left: p }))}
+        onClose={() => setSheetVisible({ left: false, right: false })}
+      />
+      <ProductSheet
+        visible={sheetVisible.right}
+        title="Pick Product 2"
+        items={[...recentScans, ...favourites, ...searchResults]}
+        onPick={(p) => setCompareSelection((prev) => ({ ...prev, right: p }))}
+        onClose={() => setSheetVisible({ left: false, right: false })}
+      />
+    </ScrollView>
+  );
+
+  const MealsScreen = () => (
+    <ScrollView style={styles.screen}>
+      <View style={styles.panelHeader}>
+        <View>
+          <Text style={styles.eyebrow}>Weekly plan</Text>
+          <Text style={styles.panelTitle}>AI-structured meals</Text>
+        </View>
+        <TouchableOpacity style={styles.primary} onPress={buildMealPlan}>
+          <Text style={styles.primaryText}>Regenerate</Text>
+        </TouchableOpacity>
+      </View>
+      {offlineSaved && <Text style={styles.offlineBadge}>Saved offline</Text>}
+      {mealPlan.length ? (
+        <View style={styles.mealGrid}>
+          {mealPlan.map((day) => (
+            <View key={day.day} style={styles.mealCard}>
+              <Text style={styles.eyebrow}>{day.day}</Text>
+              <Text style={styles.muted}>Breakfast</Text>
+              <Text style={styles.cardTitle}>{day.breakfast}</Text>
+              <Text style={styles.muted}>Lunch</Text>
+              <Text style={styles.cardTitle}>{day.lunch}</Text>
+              <Text style={styles.muted}>Dinner</Text>
+              <Text style={styles.cardTitle}>{day.dinner}</Text>
+              <Text style={styles.muted}>Snack</Text>
+              <Text style={styles.cardTitle}>{day.snack}</Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <View style={styles.placeholder}>
+          <Text style={styles.muted}>No plan yet. Tap regenerate to build one.</Text>
+        </View>
+      )}
+      {mealLoading && (
+        <View style={styles.placeholder}>
+          <ActivityIndicator size="small" color="#3b82f6" />
+          <Text style={styles.muted}>Generating plan...</Text>
+        </View>
+      )}
+      {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+    </ScrollView>
+  );
+
+  const ProfileScreen = () => (
+    <ScrollView style={styles.screen}>
+      <Text style={styles.panelTitle}>User profile</Text>
+      <View style={styles.formGrid}>
+        <View style={styles.formField}>
+          <Text style={styles.muted}>Email</Text>
+          <TextInput style={styles.input} value={authEmail} onChangeText={setAuthEmail} autoCapitalize="none" />
+        </View>
+        <View style={styles.formField}>
+          <Text style={styles.muted}>Password</Text>
+          <TextInput
+            style={styles.input}
+            value={authPassword}
+            secureTextEntry
+            onChangeText={setAuthPassword}
+            autoCapitalize="none"
+          />
+        </View>
+        <View style={styles.row}>
+          <TouchableOpacity style={styles.primary} onPress={registerUser}>
+            <Text style={styles.primaryText}>Register</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondary} onPress={loginUser}>
+            <Text style={styles.secondaryText}>Login</Text>
+          </TouchableOpacity>
+        </View>
+        {token ? <Text style={styles.muted}>Token stored for API calls.</Text> : null}
+      </View>
+      <View style={styles.formGrid}>
+        {[
+          ["Name", "name"],
+          ["Goal", "goal"],
+          ["Dietary preference", "diet"],
+          ["Allergens", "allergens"],
+          ["Daily calories target", "calorie_target"],
+        ].map(([label, key]) => (
+          <View key={key} style={styles.formField}>
+            <Text style={styles.muted}>{label}</Text>
+            <TextInput
+              style={styles.input}
+              value={String(profile[key] ?? "")}
+              keyboardType={key === "calorie_target" ? "numeric" : "default"}
+              onChangeText={(text) =>
+                persistProfile({
+                  ...profile,
+                  [key]: key === "calorie_target" ? Number(text) || 0 : text,
+                })
+              }
+            />
+          </View>
+        ))}
+      </View>
+      <View style={styles.row}>
+        <TouchableOpacity style={styles.primary} onPress={buildMealPlan}>
+          <Text style={styles.primaryText}>Save & refresh plan</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+
+  return (
+    <NavigationContainer>
+      <SafeAreaView style={styles.safe}>
+        <Stack.Navigator initialRouteName="Home" screenOptions={{ headerShown: true, contentStyle: styles.safe }}>
+          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Scan" component={ScanScreen} />
+          <Stack.Screen name="Search" component={SearchScreen} />
+          <Stack.Screen name="Compare" component={CompareScreen} />
+          <Stack.Screen name="Meals" component={MealsScreen} />
+          <Stack.Screen name="Profile" component={ProfileScreen} />
+        </Stack.Navigator>
+      </SafeAreaView>
+    </NavigationContainer>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: palette.bg },
+  screen: { padding: 16, backgroundColor: palette.bg },
+  hero: {
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: palette.card,
+    borderColor: palette.border,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+    ...shadows.card,
+  },
+  heroTitle: { color: palette.text, fontSize: 22, fontWeight: "800", marginBottom: 4 },
+  banner: {
+    backgroundColor: palette.accentSoft,
+    color: palette.muted,
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginBottom: 10,
+  },
+  panel: {
+    backgroundColor: palette.card,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginTop: 10,
+    ...shadows.card,
+  },
+  panelHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  panelTitle: { fontSize: 18, fontWeight: "800", color: palette.text, marginBottom: 6 },
+  card: {
+    backgroundColor: palette.surface,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginTop: 10,
+    ...shadows.card,
+  },
+  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 },
+  cardTitle: { color: palette.text, fontSize: 16, fontWeight: "700" },
+  nutritionGrid: { marginTop: 4, flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "space-between" },
+  pill: { backgroundColor: palette.accentSoft, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, alignItems: "center", minWidth: 72 },
+  pillSmall: { backgroundColor: palette.accentSoft, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 10, alignItems: "center", marginVertical: 8 },
+  pillScore: { color: palette.text, fontWeight: "800", fontSize: 16 },
+  pillLabel: { color: palette.muted, fontSize: 12 },
+  row: { flexDirection: "row", gap: 8, flexWrap: "wrap", marginTop: 10 },
+  primary: { backgroundColor: palette.accent, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12 },
+  primaryText: { color: "#0b1221", fontWeight: "800" },
+  secondary: { backgroundColor: palette.accentSoft, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12 },
+  secondaryText: { color: palette.text, fontWeight: "700" },
+  ghost: { backgroundColor: palette.surface, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, borderColor: palette.border, borderWidth: 1 },
+  ghostText: { color: palette.muted, fontWeight: "700" },
+  eyebrow: { color: palette.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: 1 },
+  muted: { color: palette.muted, marginTop: 2 },
+  searchRow: { flexDirection: "row", gap: 8, alignItems: "center", marginBottom: 12 },
+  input: {
+    backgroundColor: palette.surface,
+    borderColor: palette.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    color: palette.text,
+    flex: 1,
+  },
+  altGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  altCard: { backgroundColor: palette.surface, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: palette.border, width: "48%" },
+  placeholder: { padding: 16, alignItems: "center" },
+  error: { color: palette.danger, marginTop: 6 },
+  offlineBadge: { color: palette.warning, marginBottom: 6 },
+  compareSelectors: { flexDirection: "row", gap: 12 },
+  selector: { flex: 1 },
+  dropdown: { marginTop: 6, backgroundColor: palette.surface, borderColor: palette.border, borderWidth: 1, borderRadius: 10, maxHeight: 120 },
+  dropdownItem: { padding: 10 },
+  dropdownText: { color: palette.muted },
+  dropdownTextActive: { color: palette.text, fontWeight: "700" },
+  tableHead: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8 },
+  tableRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8, borderTopWidth: 1, borderColor: palette.border },
+  tableLabel: { color: palette.muted, flex: 1, fontWeight: "700" },
+  tableCell: { color: palette.text, flex: 1 },
+  mealGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  mealCard: { width: "48%", backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, borderRadius: 12, padding: 12, gap: 4 },
+  formGrid: { gap: 10, marginVertical: 10 },
+  formField: { gap: 4 },
+  scannerBox: { marginTop: 12, overflow: "hidden", borderRadius: 12, height: 220, borderWidth: 1, borderColor: palette.border },
+  spacer: { height: 12 },
+  pickerChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: palette.surface,
+    borderRadius: 12,
+    borderColor: palette.border,
+    borderWidth: 1,
+    marginRight: 8,
+  },
+  pickerChipActive: {
+    backgroundColor: palette.accent,
+    borderColor: palette.accent,
+  },
+  pickerText: { color: palette.muted, fontWeight: "700" },
+  pickerTextActive: { color: "#0b1221", fontWeight: "800" },
+  warning: { color: palette.warning, marginTop: 2 },
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: palette.surface,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
+    maxHeight: "60%",
+    borderColor: palette.border,
+    borderWidth: 1,
+  },
+  sheetItem: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderColor: palette.border,
+  },
+  skeleton: {
+    height: 12,
+    backgroundColor: palette.border,
+    borderRadius: 6,
+  },
+  chipActive: {
+    backgroundColor: palette.accent,
+    borderColor: palette.accent,
+  },
+  chipText: { color: palette.muted },
+  chipTextActive: { color: "#0b1221", fontWeight: "700" },
+});

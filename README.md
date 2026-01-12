@@ -10,12 +10,27 @@ Mobile-first food comparison and meal-planning app built to match the SRS. A Rea
 - `snackompare-srs/` – Functional specification and diagrams.
 
 ## Run the mobile app (Expo)
+Quick start (managed Expo):
 ```bash
 cd mobile
 npm install
- EXPO_PUBLIC_API_BASE=http://localhost:8000/api npx expo start
+EXPO_PUBLIC_API_BASE=http://localhost:8000/api npx expo start
 ```
-Use Expo Go on a device or an emulator. Barcode scanning uses `expo-barcode-scanner`; a “simulate scan” button works offline.
+- Open with Expo Go on your phone or an emulator. Camera scan uses `expo-barcode-scanner`; “simulate scan” works offline if you can’t use the camera.
+- Profile lets you set name, diet, health filters, and allergens; the AI assistant reads these prefs.
+- Search shows products (with cached images), compare/AI explain are in the home flows.
+
+## Run the backend (Django + DRF)
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env   # set DB/OPENAI keys if you have them
+python manage.py migrate
+python manage.py runserver 0.0.0.0:8000
+```
+- Endpoints: `/api/search`, `/api/barcode/<code>`, `/api/favourites/`, `/api/meal-plan/`, `/api/explain/`, `/api/auth/register|login/`.
+- Uses SQLite by default; switch to Postgres by editing `.env`.
 
 ## Run the backend (Django + DRF)
 ```bash

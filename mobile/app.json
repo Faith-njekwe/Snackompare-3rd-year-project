@@ -42,7 +42,7 @@
         "android.permission.ACCESS_MEDIA_LOCATION",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.READ_MEDIA_AUDIO",
+          "android.permission.READ_MEDIA_AUDIO",
         "android.permission.READ_CONTACTS",
         "android.permission.WRITE_CONTACTS",
         "android.permission.MODIFY_AUDIO_SETTINGS"
@@ -99,10 +99,6 @@
       "expo-local-authentication"
     ],
     "extra": {
-      "eas": {
-        "projectId": "8226d8fc-75cc-4ada-94dd-2c7ce1c0c078"
-      }
-    },
-    "owner": "dan6557"
+    }
   }
 }

@@ -10,6 +10,7 @@ import SearchProductsScreen from "./screens/SearchProductsScreen";
 import FavouritesScreen from "./screens/FavouritesScreen";
 import AssistantScreen from "./screens/AssistantScreen";
 import ProfileScreen from "./screens/ProfileScreen";
+import TestingScreen from "./screens/TestingScreen";
 import { palette } from "./theme";
 
 const Tab = createBottomTabNavigator();
@@ -20,7 +21,8 @@ function TabNavigator() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
+
+          let iconName = "ellipse"; // fallback
 
           if (route.name === "Home") {
             iconName = focused ? "apps" : "apps-outline";
@@ -30,7 +32,10 @@ function TabNavigator() {
             iconName = focused ? "chatbubbles" : "chatbubbles-outline";
           } else if (route.name === "Profile") {
             iconName = focused ? "person" : "person-outline";
+          } else if (route.name === "Testing") {
+            iconName = focused ? "flask" : "flask-outline";
           }
+
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
@@ -69,6 +74,11 @@ function TabNavigator() {
         name="Profile"
         component={ProfileScreen}
         options={{ title: "Profile" }}
+      />
+      <Tab.Screen
+        name="Testing"
+        component={TestingScreen}
+        options={{ title: "Testing" }}
       />
     </Tab.Navigator>
   );

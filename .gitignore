@@ -1,0 +1,23 @@
+.env
+backend/.env
+venv/
+backend/venv/
+node_modules/
+mobile/node_modules/
+frontend/node_modules/
+
+# --- Django / Python ---
+__pycache__/
+*.py[cod]
+db.sqlite3
+backend/db.sqlite3
+
+# --- React Native / Expo ---
+.expo/
+dist/
+mobile/ios/
+mobile/android/
+
+
+.DS_Store
+Thumbs.db

@@ -8,9 +8,10 @@ import { Platform } from "react-native";
 import HomeScreen from "./screens/HomeScreen";
 import SearchProductsScreen from "./screens/SearchProductsScreen";
 import FavouritesScreen from "./screens/FavouritesScreen";
-import AssistantScreen from "./screens/AssistantScreen";
 import ProfileScreen from "./screens/ProfileScreen";
-import TestingScreen from "./screens/TestingScreen";
+import AIChatbotScreen from "./screens/AIChatbotScreen";
+import TakePhotoScreen from "./screens/TakePhotoScreen";
+import MealPhotoCameraScreen from "./screens/MealPhotoCameraScreen";
 import { palette } from "./theme";
 
 const Tab = createBottomTabNavigator();
@@ -28,12 +29,12 @@ function TabNavigator() {
             iconName = focused ? "apps" : "apps-outline";
           } else if (route.name === "Favourites") {
             iconName = focused ? "heart" : "heart-outline";
-          } else if (route.name === "Assistant") {
-            iconName = focused ? "chatbubbles" : "chatbubbles-outline";
+          } else if (route.name === "CalorieTracker") {
+            iconName = focused ? "camera" : "camera-outline";
           } else if (route.name === "Profile") {
             iconName = focused ? "person" : "person-outline";
-          } else if (route.name === "Testing") {
-            iconName = focused ? "flask" : "flask-outline";
+          } else if (route.name === "Chatbot") {
+            iconName = focused ? "chatbubbles" : "chatbubbles-outline";
           }
 
 
@@ -66,21 +67,49 @@ function TabNavigator() {
         options={{ title: "Favourites" }}
       />
       <Tab.Screen
-        name="Assistant"
-        component={AssistantScreen}
-        options={{ title: "AI Assistant", headerShown: false }}
-      />
-      <Tab.Screen
         name="Profile"
         component={ProfileScreen}
         options={{ title: "Profile" }}
       />
       <Tab.Screen
-        name="Testing"
-        component={TestingScreen}
-        options={{ title: "Testing" }}
+        name="Chatbot"
+        component={AIChatbotScreen}
+        options={{ title: "Chatbot" }}
+      />
+      {/* Got rid of assistant screen in the navbar for now */}
+      <Tab.Screen
+        name="CalorieTracker"
+        component={CalorieTrackerStack}
+        options={{ title: "Calorie Tracker", headerShown: false }}
       />
     </Tab.Navigator>
+  );
+}
+
+function CalorieTrackerStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="TakePhoto"
+        component={TakePhotoScreen}
+        options={{
+          title: "Calorie Tracker",
+          headerStyle: { backgroundColor: palette.card },
+          headerTintColor: palette.text,
+          headerShadowVisible: false,
+        }}
+      />
+      <Stack.Screen
+        name="MealPhotoCameraScreen"
+        component={MealPhotoCameraScreen}
+        options={{
+          title: "Capture Meal",
+          headerShown: true,
+          headerStyle: { backgroundColor: "#000" },
+          headerTintColor: "#fff",
+        }}
+      />
+    </Stack.Navigator>
   );
 }
 

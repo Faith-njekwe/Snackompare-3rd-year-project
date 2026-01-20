@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { palette } from "../theme";
@@ -124,8 +125,16 @@ export default function DietChatScreen() {
           placeholderTextColor="#888"
           multiline
         />
-        <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-          <Text style={{ color: "white", fontWeight: "bold" }}>➤</Text>
+        <TouchableOpacity
+          style={styles.sendButton}
+          onPress={sendMessage}
+          disabled={isSending}
+        >
+          {isSending ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={{ color: "white", fontWeight: "bold" }}>➤</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>

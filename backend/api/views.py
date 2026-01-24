@@ -12,6 +12,9 @@ from django.contrib.auth.models import User
 from .services import fetch_barcode, fetch_search, generate_meal_plan_llm, get_or_cache_product, health_delta
 from .utils import clean_product, compute_health_score
 from openai import OpenAI
+from rest_framework.parsers import MultiPartParser, FormParser
+from .services import estimate_calories_from_image_bytes
+
 import os
 
 DIET_SYSTEM_PROMPT = """
@@ -76,13 +79,11 @@ class ChatView(APIView):
           messages.append({"role": role, "content": content})
       messages.append({"role": "user", "content": prompt})
 
-      # FIX: Use chat.completions instead of responses
       resp = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=messages,
       )
 
-      # FIX: Access the content via choices[0].message.content
       ai_text = resp.choices[0].message.content
       return Response({"aiResponse": ai_text})
 
@@ -255,5 +256,57 @@ class LoginView(APIView):
       return Response({"error": "invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
     token, _ = Token.objects.get_or_create(user=user)
     return Response({"token": token.key, "user_id": user.id})
+
+
+class MealPhotoCaloriesView(APIView):
+    """
+    Accepts a meal photo and returns an estimated calorie breakdown.
+    """
+
+    parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [] 
+
+    def post(self, request):
+        """For debugging"""
+        print(f"FILES in request: {request.FILES}")
+        image = request.FILES.get("image")
+
+        if image:
+            print(f"Image Found: {image.name}")
+        else:
+            print("No image found in request.FILES")
+
+        if not image:
+            return Response(
+                {"error": "image is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            # Read image bytes and pass to vision service
+            result = estimate_calories_from_image_bytes(image.read())
+
+            return Response(
+                result,
+                status=status.HTTP_200_OK,
+            )
+
+        except ValueError as e:
+            return Response(
+                {
+                    "error": "Could not analyze meal photo",
+                    "detail": str(e),
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
+        except Exception as e:
+            return Response(
+                {
+                    "error": "Internal server error",
+                    "detail": str(e),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 

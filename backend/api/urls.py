@@ -8,6 +8,7 @@ from .views import (
   PingView,
   RegisterView,
   SearchView,
+  ChatView
 )
 
 urlpatterns = [
@@ -19,4 +20,5 @@ urlpatterns = [
   path("explain/", ExplainView.as_view(), name="explain"),
   path("auth/register/", RegisterView.as_view(), name="register"),
   path("auth/login/", LoginView.as_view(), name="login"),
+  path("chat/", ChatView.as_view()),
 ]

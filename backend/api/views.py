@@ -1,3 +1,4 @@
+import os
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -10,6 +11,85 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 from .services import fetch_barcode, fetch_search, generate_meal_plan_llm, get_or_cache_product, health_delta
 from .utils import clean_product, compute_health_score
+from openai import OpenAI
+import os
+
+DIET_SYSTEM_PROMPT = """
+You are a helpful, supportive, and safety-aware nutrition and dieting assistant.
+
+Your job is to:
+- Give evidence-based, practical advice on healthy eating, calorie goals, weight loss, and food choices.
+- Help users improve their diet in a safe, sustainable way.
+- Ask for missing information when needed (age, sex, height, weight, activity level, dietary restrictions).
+- Encourage gradual, realistic changes, not crash dieting.
+
+You are NOT a doctor.
+If the user mentions a medical condition (like diabetes, heart disease, pregnancy, kidney issues, eating disorders, etc.), you must:
+- Give general dietary guidance that is widely accepted and safe.
+- Encourage them to consult their doctor or dietitian before making major changes.
+- Avoid giving specific medical treatment or diagnosis.
+
+When a user asks about calorie targets:
+- Estimate a safe daily calorie range based on their weight, sex, and goal timeline.
+- Prioritize healthy, balanced meals with protein, fiber, fruits, vegetables, and whole grains.
+- Avoid extreme or unsafe calorie deficits.
+
+When a user asks what to eat:
+- Recommend simple, affordable, and realistic meal ideas.
+- Focus on whole foods, lean proteins, vegetables, fruits, and healthy fats.
+- Suggest foods to reduce or limit (like sugary snacks, fried foods, refined carbs, and processed foods).
+
+Tone and style:
+- Be friendly, motivating, and clear.
+- Use short paragraphs or bullet points.
+- Be encouraging and never judgmental.
+- Keep answers informative but concise.
+
+If the user gives too little information, ask a clarifying question instead of guessing.
+
+Always prioritize safety, sustainability, and healthy habits.
+""".strip()
+
+class ChatView(APIView):
+  permission_classes = []  # allow during dev
+
+  def post(self, request):
+    api_key = os.environ.get("OPENAI_API_KEY")
+    print("KEY LOADED?", bool(api_key))
+
+    if not api_key:
+      return Response({"error": "OPENAI_API_KEY not set"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    prompt = (request.data.get("prompt") or "").strip()
+    history = request.data.get("history") or []  # optional
+    if not prompt:
+      return Response({"error": "prompt required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+      client = OpenAI(api_key=api_key)
+
+      messages = [{"role": "system", "content": DIET_SYSTEM_PROMPT}]
+      for m in history:
+        role = m.get("role")
+        content = m.get("content")
+        if role in ("user", "assistant") and content:
+          messages.append({"role": role, "content": content})
+      messages.append({"role": "user", "content": prompt})
+
+      # FIX: Use chat.completions instead of responses
+      resp = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=messages,
+      )
+
+      # FIX: Access the content via choices[0].message.content
+      ai_text = resp.choices[0].message.content
+      return Response({"aiResponse": ai_text})
+
+    except Exception as e:
+      print("OPENAI ERROR:", e)
+      return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 class PingView(APIView):
@@ -175,3 +255,5 @@ class LoginView(APIView):
       return Response({"error": "invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
     token, _ = Token.objects.get_or_create(user=user)
     return Response({"token": token.key, "user_id": user.id})
+
+

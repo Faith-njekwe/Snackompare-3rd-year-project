@@ -1,7 +1,8 @@
 {
   "expo": {
     "name": "SnacKompare",
-    "slug": "snackompare",
+    "slug": "snackompare-mobile",
+    "jsEngine": "hermes",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -24,7 +25,10 @@
         "NSCalendarsUsageDescription": "Allow SnacKompare to access your calendar.",
         "NSRemindersUsageDescription": "Allow SnacKompare to access your reminders.",
         "NSFaceIDUsageDescription": "Allow SnacKompare to use Face ID for authentication.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
       }
     },
     "android": {
@@ -98,11 +102,11 @@
       "expo-secure-store",
       "expo-local-authentication"
     ],
+    "owner": "snackompare",
     "extra": {
       "eas": {
-        "projectId": "fc01c1f5-f005-4c4c-b23a-37e4104e07f0"
+        "projectId": "1ece5130-e82d-4de9-be52-b585b5e11441"
       }
-    },
-    "owner": "snackompare"
+    }
   }
 }

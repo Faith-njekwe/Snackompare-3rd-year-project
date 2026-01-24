@@ -79,13 +79,11 @@ class ChatView(APIView):
           messages.append({"role": role, "content": content})
       messages.append({"role": "user", "content": prompt})
 
-      # FIX: Use chat.completions instead of responses
       resp = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=messages,
       )
 
-      # FIX: Access the content via choices[0].message.content
       ai_text = resp.choices[0].message.content
       return Response({"aiResponse": ai_text})
 
@@ -266,7 +264,7 @@ class MealPhotoCaloriesView(APIView):
     """
 
     parser_classes = [MultiPartParser, FormParser]
-    permission_classes = []  # allow during dev
+    permission_classes = [] 
 
     def post(self, request):
         """For debugging"""
@@ -303,7 +301,6 @@ class MealPhotoCaloriesView(APIView):
             )
 
         except Exception as e:
-            # Unexpected errors
             return Response(
                 {
                     "error": "Internal server error",

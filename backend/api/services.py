@@ -14,6 +14,10 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
   openai = None
 
+import base64
+import json
+from openai import OpenAI
+
 logger = logging.getLogger(__name__)
 
 OPENFOODFACTS_BASE = "https://world.openfoodfacts.org"
@@ -128,3 +132,113 @@ def _build_prompt(profile: dict, favourites: List[dict]) -> str:
     f"Prefer these foods when reasonable: {favourite_names}. "
     "Respond concisely in bullet form per day."
   )
+
+# For meal photo analysis
+
+VISION_SYSTEM_PROMPT = """
+You are a food image calorie estimation system.
+
+You MUST:
+- Analyze the provided food image
+- Identify visible foods
+- Estimate portion size in grams
+- Estimate calories per item
+- Return ONLY valid JSON
+- Follow the exact schema provided
+- Use assumptions when uncertain
+- Include confidence scores between 0 and 1
+
+You MUST NOT:
+- Ask questions
+- Include explanations
+- Include markdown
+- Include comments
+- Include extra keys
+- Include text outside JSON
+
+If uncertain, lower confidence instead of refusing.
+""".strip()
+
+VISION_USER_PROMPT = """
+Estimate calories from this meal photo.
+
+Return JSON using this exact schema:
+
+{
+  "items": [
+    {
+      "name": "string",
+      "estimated_grams": number,
+      "calories": number,
+      "confidence": number,
+      "assumptions": ["string"]
+    }
+  ],
+  "total_calories": number,
+  "overall_confidence": number
+}
+""".strip()
+
+_vision_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+
+def _validate_vision_json(raw: str) -> dict:
+    try:
+        cleaned_raw = raw.replace("```json", "").replace("```", "").strip()
+        data = json.loads(cleaned_raw)
+    except json.JSONDecodeError:
+        logger.error("Vision returned invalid JSON: %s", raw)
+        raise ValueError("Vision model returned invalid JSON")
+
+    required_top = {"items", "total_calories", "overall_confidence"}
+    if not required_top.issubset(data):
+        raise ValueError("Missing top-level keys")
+
+    for item in data["items"]:
+        for k in ("name", "estimated_grams", "calories", "confidence", "assumptions"):
+            if k not in item:
+                raise ValueError("Invalid item schema")
+
+        item["confidence"] = max(0.0, min(1.0, float(item["confidence"])))
+
+    data["overall_confidence"] = max(
+        0.0, min(1.0, float(data["overall_confidence"]))
+    )
+
+    return data
+
+
+def estimate_calories_from_image_bytes(image_bytes: bytes) -> dict:
+    """
+    Vision-based calorie estimation using GPT-4o-mini.
+    Returns validated structured JSON.
+    """
+    if not image_bytes:
+        raise ValueError("Empty image")
+
+    image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+
+    resp = _vision_client.chat.completions.create(
+        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        temperature=0.2,
+        max_tokens=700,
+        messages=[
+            {"role": "system", "content": VISION_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": VISION_USER_PROMPT},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{image_b64}"
+                        }
+                    },
+                ],
+            },
+        ],
+    )
+
+    raw = resp.choices[0].message.content
+    return _validate_vision_json(raw)
+

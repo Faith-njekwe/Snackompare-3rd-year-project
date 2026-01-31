@@ -13,6 +13,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { palette } from "../theme";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { API_BASE_URL } from "../config";
 
 export default function DietChatScreen() {
   const [input, setInput] = useState("");
@@ -27,19 +28,24 @@ export default function DietChatScreen() {
   const [isSending, setIsSending] = useState(false);
   const scrollRef = useRef(null);
 
-  const API_URL = "http://192.168.1.15:8000/api/chat/"; // replace with your machine IP if testing on a phone
+ // used API_BASE_URL from config.js so as to not hardcode the URL here (hosted on railway)
+  const API_URL = `${API_BASE_URL}/api/chat/`; 
 
   const sendMessage = async () => {
     const trimmed = input.trim();
     if (!trimmed || isSending) return;
 
     const userMsg = { id: String(Date.now()), role: "user", text: trimmed };
-    setMessages((prev) => [...prev, userMsg]);
+
+    // Append the user's message to the current conversation state
+    const nextMessages = [...messages, userMsg];
+
+    // Update UI immediately
+    setMessages(nextMessages);
     setInput("");
     setIsSending(true);
 
-    // Build history for backend
-    const history = messages
+    const history = nextMessages
       .filter((m) => m.role === "user" || m.role === "assistant")
       .map((m) => ({ role: m.role, content: m.text }));
 
@@ -114,7 +120,7 @@ export default function DietChatScreen() {
       ))}
     </ScrollView>
 
-    {/* Your bottom input area */}
+    {/* Input Area */}
     <View style={styles.bottomContainer}>
       <View style={styles.inputContainer}>
         <TextInput

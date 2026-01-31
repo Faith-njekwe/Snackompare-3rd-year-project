@@ -15,8 +15,6 @@ from openai import OpenAI
 from rest_framework.parsers import MultiPartParser, FormParser
 from .services import estimate_calories_from_image_bytes
 
-import os
-
 DIET_SYSTEM_PROMPT = """
 You are a helpful, supportive, and safety-aware nutrition and dieting assistant.
 
@@ -273,6 +271,9 @@ class MealPhotoCaloriesView(APIView):
 
         if image:
             print(f"Image Found: {image.name}")
+            size_bytes = image.size
+            size_mb = size_bytes / (1024 * 1024)
+            print(f"Image Found: {image.name} | Size: {size_bytes} bytes ({size_mb:.2f} MB)")     
         else:
             print("No image found in request.FILES")
 
@@ -281,7 +282,16 @@ class MealPhotoCaloriesView(APIView):
                 {"error": "image is required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
+        
+        if image.size > 5 * 1024 * 1024:
+            return Response(
+                {
+                    "error": "image too large",
+                    "detail": "Please take a closer photo of your meal.",
+                },
+                status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            )
+        
         try:
             # Read image bytes and pass to vision service
             result = estimate_calories_from_image_bytes(image.read())

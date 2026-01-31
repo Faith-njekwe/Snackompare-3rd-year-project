@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Animated, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { palette } from "../theme";
@@ -7,9 +7,15 @@ import { palette } from "../theme";
 export default function HomeScreen({ navigation }) {
   const scaleScan = useAnimatedScale();
   const scaleSearch = useAnimatedScale();
+  const scaleFavourites = useAnimatedScale();
+
 
   return (
     <SafeAreaView style={styles.container}>
+      <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.scrollContent}
+    >
       <View style={styles.content}>
         <Text style={styles.title}>SnacKompare</Text>
         <Text style={styles.subtitle}>
@@ -20,6 +26,7 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.sectionTitle}>Choose how to check your food</Text>
           <Text style={styles.sectionSubtitle}>
             Scan a barcode or search by name to see scores, alternatives, and plans.
+            Save your favourites for quick access later!
           </Text>
         </View>
 
@@ -65,6 +72,27 @@ export default function HomeScreen({ navigation }) {
               </View>
             </TouchableOpacity>
           </Animated.View>
+
+          <Animated.View style={[styles.optionCard, { transform: [{ scale: scaleFavourites }] }]}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPressIn={() => animatePress(scaleFavourites, 0.97)}
+              onPressOut={() => animatePress(scaleFavourites, 1)}
+              onPress={() => navigation.navigate("Favourites")}
+            >
+              <View style={[styles.gradientCard, styles.favouritesCard]}>
+                <View style={styles.decorOne} />
+                <View style={styles.decorTwo} />
+                <View style={[styles.iconContainer, styles.iconOverlay]}>
+                   <Ionicons name="heart" size={40} color="#ffffff" />
+                </View>
+                <Text style={styles.optionTitle}>Favourites</Text>
+                <Text style={styles.optionDescription}>
+                  View and manage your favourite products.
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
         </View>
 
         <View style={styles.statsContainer}>
@@ -85,6 +113,7 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
       </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -147,7 +176,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   optionCard: {
-    borderRadius: 20,
+    borderRadius: 16,
     overflow: "hidden",
     elevation: 6,
     shadowColor: "#000",
@@ -156,8 +185,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   gradientCard: {
-    padding: 16,
-    minHeight: 135,
+    padding: 12,
+    minHeight: 120,
     justifyContent: "center",
     alignItems: "center",
     gap: 10,
@@ -166,10 +195,11 @@ const styles = StyleSheet.create({
   },
   scanCard: { backgroundColor: "#4f8ef7", borderColor: "#4f8ef7", borderWidth: 1 },
   searchCard: { backgroundColor: "#13b981", borderColor: "#059669", borderWidth: 1 },
+  favouritesCard: { backgroundColor: "#ef4444", borderColor: "#dc2626", borderWidth: 1 },
   iconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: "rgba(0, 0, 0, 0.12)",
     justifyContent: "center",
     alignItems: "center",
@@ -177,8 +207,9 @@ const styles = StyleSheet.create({
   },
   scanIconBg: { backgroundColor: "rgba(255,255,255,0.18)" },
   searchIconBg: { backgroundColor: "rgba(255,255,255,0.18)" },
+  favouritesIconBg: { backgroundColor: "rgba(255,255,255,0.18)" },
   optionTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "700",
     color: palette.text,
     marginBottom: 4,
@@ -231,5 +262,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: palette.muted,
     marginTop: 4,
+  },
+  scrollContent: {
+  paddingBottom: 30,
   },
 });

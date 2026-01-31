@@ -91,7 +91,6 @@ def health_delta(base: dict, alt: dict) -> dict:
   deltas["score_delta"] = compute_health_score(alt) - compute_health_score(base)
   return deltas
 
-
 def generate_meal_plan_llm(profile: dict, favourites: List[dict]) -> dict:
   """Call OpenAI if available, otherwise return a deterministic mocked plan."""
   api_key = os.getenv("OPENAI_API_KEY")
@@ -220,6 +219,7 @@ def estimate_calories_from_image_bytes(image_bytes: bytes) -> dict:
 
     resp = _vision_client.chat.completions.create(
         model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        #0.2 because food estimation is ambiguous, we want some room for interpretation
         temperature=0.2,
         max_tokens=700,
         messages=[

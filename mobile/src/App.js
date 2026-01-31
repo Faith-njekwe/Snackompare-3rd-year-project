@@ -12,6 +12,9 @@ import ProfileScreen from "./screens/ProfileScreen";
 import AIChatbotScreen from "./screens/AIChatbotScreen";
 import TakePhotoScreen from "./screens/TakePhotoScreen";
 import MealPhotoCameraScreen from "./screens/MealPhotoCameraScreen";
+import CalorieCountScreen from "./screens/CalorieCountScreen";
+import ScanScreen from "./screens/ScanScreen";
+import { CalorieTotalProvider } from "./context/CalorieTotalContext";
 import { palette } from "./theme";
 
 const Tab = createBottomTabNavigator();
@@ -27,9 +30,9 @@ function TabNavigator() {
 
           if (route.name === "Home") {
             iconName = focused ? "apps" : "apps-outline";
-          } else if (route.name === "Favourites") {
-            iconName = focused ? "heart" : "heart-outline";
-          } else if (route.name === "CalorieTracker") {
+          } else if (route.name === "CalorieCounter") {
+            iconName = focused ? "flame" : "flame-outline";
+          } else if (route.name === "MealTracker") {
             iconName = focused ? "camera" : "camera-outline";
           } else if (route.name === "Profile") {
             iconName = focused ? "person" : "person-outline";
@@ -61,10 +64,11 @@ function TabNavigator() {
         component={HomeStack}
         options={{ title: "SnacKompare", headerShown: false }}
       />
+      {/* Removed Favourites from the navbar for now too*/}
       <Tab.Screen
-        name="Favourites"
-        component={FavouritesScreen}
-        options={{ title: "Favourites" }}
+        name="CalorieCounter"
+        component={CalorieCountScreen}
+        options={{ title: "Calorie Counter" }}
       />
       <Tab.Screen
         name="Profile"
@@ -78,22 +82,22 @@ function TabNavigator() {
       />
       {/* Got rid of assistant screen in the navbar for now */}
       <Tab.Screen
-        name="CalorieTracker"
-        component={CalorieTrackerStack}
-        options={{ title: "Calorie Tracker", headerShown: false }}
+        name="MealTracker"
+        component={MealTrackerStack}
+        options={{ title: "Meal Tracker", headerShown: false }}
       />
     </Tab.Navigator>
   );
 }
 
-function CalorieTrackerStack() {
+function MealTrackerStack() {
   return (
     <Stack.Navigator>
       <Stack.Screen
         name="TakePhoto"
         component={TakePhotoScreen}
         options={{
-          title: "Calorie Tracker",
+          title: "Meal Tracker",
           headerStyle: { backgroundColor: palette.card },
           headerTintColor: palette.text,
           headerShadowVisible: false,
@@ -135,9 +139,19 @@ function HomeStack() {
       />
       <Stack.Screen
         name="Scan"
-        component={require("./screens/ScanScreen").default}
+        component={ScanScreen}
         options={{
           title: "Scan Barcode",
+          headerStyle: { backgroundColor: palette.card },
+          headerTintColor: palette.text,
+          headerShadowVisible: false,
+        }}
+      />
+      <Stack.Screen
+        name="Favourites"
+        component={FavouritesScreen}
+        options={{
+          title: "Favourites",
           headerStyle: { backgroundColor: palette.card },
           headerTintColor: palette.text,
           headerShadowVisible: false,
@@ -149,8 +163,10 @@ function HomeStack() {
 
 export default function App() {
   return (
-    <NavigationContainer>
-      <TabNavigator />
-    </NavigationContainer>
+    <CalorieTotalProvider>
+      <NavigationContainer>
+        <TabNavigator />
+      </NavigationContainer>
+    </CalorieTotalProvider>
   );
 }

@@ -7,6 +7,7 @@ import { Platform } from "react-native";
 
 import HomeScreen from "./screens/HomeScreen";
 import SearchProductsScreen from "./screens/SearchProductsScreen";
+import CompareProductsScreen from "./screens/CompareProductsScreen";
 import FavouritesScreen from "./screens/FavouritesScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import AIChatbotScreen from "./screens/AIChatbotScreen";
@@ -71,20 +72,14 @@ function TabNavigator() {
         options={{ title: "Calorie Counter" }}
       />
       <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{ title: "Profile" }}
+        name="MealTracker"
+        component={MealTrackerStack}
+        options={{ title: "Meal Tracker", headerShown: false }}
       />
       <Tab.Screen
         name="Chatbot"
         component={AIChatbotScreen}
         options={{ title: "Chatbot" }}
-      />
-      {/* Got rid of assistant screen in the navbar for now */}
-      <Tab.Screen
-        name="MealTracker"
-        component={MealTrackerStack}
-        options={{ title: "Meal Tracker", headerShown: false }}
       />
     </Tab.Navigator>
   );
@@ -121,7 +116,7 @@ function HomeStack() {
   return (
     <Stack.Navigator>
       <Stack.Screen
-        name="HomeMain"
+        name="Home"
         component={HomeScreen}
         options={{ headerShown: false }}
       />
@@ -129,7 +124,7 @@ function HomeStack() {
         name="SearchProducts"
         component={SearchProductsScreen}
         options={{
-          title: "Search Products",
+          title: "",
           headerStyle: {
             backgroundColor: palette.card,
           },
@@ -152,6 +147,17 @@ function HomeStack() {
         component={FavouritesScreen}
         options={{
           title: "Favourites",
+          headerStyle: { backgroundColor: palette.card },
+          headerTintColor: palette.text,
+          headerShadowVisible: false,
+        }}
+      />
+      <Stack.Screen
+        name="CompareProducts"
+        component={CompareProductsScreen}
+        options={{
+          title: "Compare Products",
+          headerTitleAlign: "center",
           headerStyle: { backgroundColor: palette.card },
           headerTintColor: palette.text,
           headerShadowVisible: false,

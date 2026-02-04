@@ -1,5 +1,23 @@
 const BASE_URL = "https://world.openfoodfacts.org";
 
+// Only fetch fields we actually need - significantly reduces payload size and speeds up loading
+const SEARCH_FIELDS = [
+  "code",
+  "product_name",
+  "brands",
+  "categories_tags",
+  "categories",
+  "image_front_small_url",
+  "image_front_thumb_url",
+  "image_url",
+  "nutriments",
+  "allergens_tags",
+  "additives_tags",
+  "ingredients_text",
+  "nutriscore_grade",
+  "ecoscore_grade",
+].join(",");
+
 /**
  * Search for products by name
  * @param {string} query - Search term
@@ -17,6 +35,7 @@ export async function searchProducts(query, pageSize = 10) {
       search_simple: 1,
       json: 1,
       page_size: pageSize,
+      fields: SEARCH_FIELDS,
     });
 
     const response = await fetch(`${BASE_URL}/cgi/search.pl?${params}`);
@@ -75,12 +94,17 @@ export function cleanProduct(product) {
 
   const nutriments = product.nutriments || {};
 
+  // Prefer smaller images for faster loading in lists
+  const thumbnailImage = product.image_front_small_url || product.image_front_thumb_url;
+  const fullImage = product.image_url || product.image_front_url;
+
   return {
     code: product.code || product.id || "",
     name: product.product_name || "Unknown Product",
     brand: product.brands || "Unknown Brand",
     category: getCategory(product),
-    image: product.image_url || product.image_front_url || null,
+    image: thumbnailImage || fullImage || null,
+    imageFull: fullImage || thumbnailImage || null,
     nutriments: {
       energy: nutriments["energy-kcal_100g"] || nutriments.energy_100g || 0,
       fat: nutriments.fat_100g || 0,
@@ -299,6 +323,52 @@ export function computeHealthScore(nutriments, category = "") {
  * @param {Object} rawProduct - Raw product data from Open Food Facts
  * @returns {Object} Formatted product for app use
  */
+/**
+ * Search for healthier alternatives in the same category
+ * @param {string} category - Product category
+ * @param {number} currentScore - Current product's health score
+ * @param {string} excludeId - Product ID to exclude from results
+ * @returns {Promise<Array>} Array of healthier alternatives
+ */
+export async function findHealthierAlternatives(category, currentScore, excludeId) {
+  if (!category || currentScore >= 90) {
+    return [];
+  }
+
+  try {
+    // Search for products in the same category
+    const categorySearch = category.toLowerCase().split("-")[0].trim();
+    const params = new URLSearchParams({
+      search_terms: categorySearch,
+      search_simple: 1,
+      json: 1,
+      page_size: 15,
+      fields: SEARCH_FIELDS,
+    });
+
+    const response = await fetch(`${BASE_URL}/cgi/search.pl?${params}`);
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const data = await response.json();
+    const products = data.products || [];
+
+    // Format and filter for healthier options
+    const alternatives = products
+      .map(formatProductForApp)
+      .filter((p) => p !== null && p.id !== excludeId && p.score > currentScore)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+
+    return alternatives;
+  } catch (error) {
+    console.error("Error finding alternatives:", error);
+    return [];
+  }
+}
+
 export function formatProductForApp(rawProduct) {
   const cleaned = cleanProduct(rawProduct);
   if (!cleaned) {
@@ -314,6 +384,7 @@ export function formatProductForApp(rawProduct) {
     category: cleaned.category,
     score: score,
     image: cleaned.image,
+    imageFull: cleaned.imageFull,
     nutriments: cleaned.nutriments,
     additives: cleaned.additives,
     allergens: cleaned.allergens,

@@ -28,8 +28,8 @@ export default function DietChatScreen() {
   const [isSending, setIsSending] = useState(false);
   const scrollRef = useRef(null);
 
- // used API_BASE_URL from config.js so as to not hardcode the URL here (hosted on railway)
-  const API_URL = `${API_BASE_URL}/api/chat/`; 
+// used API_BASE_URL from config.js so as to not hardcode the URL here (hosted on railway)
+  const API_URL = `${API_BASE_URL}/api/chat/`;
 
   const sendMessage = async () => {
     const trimmed = input.trim();

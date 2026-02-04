@@ -1,9 +1,21 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, Image, ScrollView } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Modal,
+  Image,
+  ScrollView,
+  Animated,
+  Easing,
+  Vibration,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Camera, useCameraDevice, useCodeScanner } from "react-native-vision-camera";
 import { Ionicons } from "@expo/vector-icons";
-import { palette } from "../theme";
+import { palette, shadows } from "../theme";
 import { getProductByBarcode, formatProductForApp } from "../services/openFoodFacts";
 import { addFavorite, isFavorite } from "../services/storage";
 
@@ -16,7 +28,13 @@ export default function ScanScreen() {
   const [isLoadingProduct, setIsLoadingProduct] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
+  const [notFound, setNotFound] = useState(false);
   const device = useCameraDevice("back");
+
+  // Animations
+  const scanLineAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const modalSlide = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     (async () => {
@@ -25,25 +43,76 @@ export default function ScanScreen() {
     })();
   }, []);
 
+  // Scanning line animation
+  useEffect(() => {
+    if (isScanning) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(scanLineAnim, {
+            toValue: 1,
+            duration: 2000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(scanLineAnim, {
+            toValue: 0,
+            duration: 2000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      scanLineAnim.setValue(0);
+    }
+  }, [isScanning]);
+
+  // Corner pulse animation
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
   const fetchProductData = async (barcode) => {
     setIsLoadingProduct(true);
+    setNotFound(false);
     try {
       const rawProduct = await getProductByBarcode(barcode);
       if (rawProduct) {
         const formattedProduct = formatProductForApp(rawProduct);
         setProduct(formattedProduct);
 
-        // Check if already favorited
         const favoriteStatus = await isFavorite(formattedProduct.id);
         setIsFavorited(favoriteStatus);
 
+        // Animate modal in
         setShowProductModal(true);
+        Animated.spring(modalSlide, {
+          toValue: 1,
+          useNativeDriver: true,
+          damping: 15,
+        }).start();
       } else {
         setProduct(null);
+        setNotFound(true);
+        Vibration.vibrate(100);
       }
     } catch (error) {
       console.error("Error fetching product:", error);
       setProduct(null);
+      setNotFound(true);
     } finally {
       setIsLoadingProduct(false);
     }
@@ -55,6 +124,7 @@ export default function ScanScreen() {
     const success = await addFavorite(product);
     if (success) {
       setIsFavorited(true);
+      Vibration.vibrate(50);
     }
   };
 
@@ -67,15 +137,15 @@ export default function ScanScreen() {
           setIsActive(false);
           setScannedCode(code.value);
           setIsScanning(false);
+          Vibration.vibrate(50);
 
-          // Fetch product data
           fetchProductData(code.value);
 
-          // Reactivate after 3 seconds
           setTimeout(() => {
             setIsActive(true);
             setIsScanning(true);
             setScannedCode(null);
+            setNotFound(false);
           }, 3000);
         }
       }
@@ -83,8 +153,14 @@ export default function ScanScreen() {
   });
 
   const closeModal = () => {
-    setShowProductModal(false);
-    setProduct(null);
+    Animated.timing(modalSlide, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowProductModal(false);
+      setProduct(null);
+    });
   };
 
   const getScoreColor = (score) => {
@@ -93,20 +169,33 @@ export default function ScanScreen() {
     return palette.danger;
   };
 
+  const getScoreLabel = (score) => {
+    if (score >= 80) return "Excellent";
+    if (score >= 60) return "Good";
+    if (score >= 40) return "Fair";
+    return "Poor";
+  };
+
   if (!hasPermission) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centerContainer}>
-          <Ionicons name="camera-outline" size={64} color={palette.muted} />
-          <Text style={styles.permissionText}>Camera permission required</Text>
+          <View style={styles.permissionIcon}>
+            <Ionicons name="camera-outline" size={48} color={palette.accent} />
+          </View>
+          <Text style={styles.permissionTitle}>Camera Access Required</Text>
+          <Text style={styles.permissionText}>
+            We need camera permission to scan product barcodes
+          </Text>
           <TouchableOpacity
-            style={styles.button}
+            style={styles.permissionButton}
             onPress={async () => {
               const status = await Camera.requestCameraPermission();
               setHasPermission(status === "granted");
             }}
           >
-            <Text style={styles.buttonText}>Grant Permission</Text>
+            <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.permissionButtonText}>Grant Permission</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -118,7 +207,7 @@ export default function ScanScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={palette.accent} />
-          <Text style={styles.permissionText}>Loading camera...</Text>
+          <Text style={styles.loadingText}>Initializing camera...</Text>
         </View>
       </SafeAreaView>
     );
@@ -134,48 +223,102 @@ export default function ScanScreen() {
       />
 
       <View style={styles.overlay}>
-        <View style={styles.topOverlay} />
+        <View style={styles.topOverlay}>
+          <View style={styles.topContent}>
+            <Ionicons name="scan" size={24} color="#FFFFFF" />
+            <Text style={styles.topTitle}>Scan Barcode</Text>
+          </View>
+        </View>
+
         <View style={styles.middleRow}>
           <View style={styles.sideOverlay} />
           <View style={styles.scanArea}>
-            <View style={[styles.corner, styles.topLeft]} />
-            <View style={[styles.corner, styles.topRight]} />
-            <View style={[styles.corner, styles.bottomLeft]} />
-            <View style={[styles.corner, styles.bottomRight]} />
+            <Animated.View style={[styles.corner, styles.topLeft, { transform: [{ scale: pulseAnim }] }]} />
+            <Animated.View style={[styles.corner, styles.topRight, { transform: [{ scale: pulseAnim }] }]} />
+            <Animated.View style={[styles.corner, styles.bottomLeft, { transform: [{ scale: pulseAnim }] }]} />
+            <Animated.View style={[styles.corner, styles.bottomRight, { transform: [{ scale: pulseAnim }] }]} />
+
+            {isScanning && (
+              <Animated.View
+                style={[
+                  styles.scanLine,
+                  {
+                    transform: [
+                      {
+                        translateY: scanLineAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, 230],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              />
+            )}
           </View>
           <View style={styles.sideOverlay} />
         </View>
+
         <View style={styles.bottomOverlay}>
-          <Text style={styles.instructionText}>
-            {isLoadingProduct
-              ? "Loading product..."
-              : isScanning
-              ? "Point camera at barcode"
-              : scannedCode && !product && !isLoadingProduct
-              ? "Product not found in database"
-              : scannedCode
-              ? `Scanned: ${scannedCode}`
-              : "Scanning..."}
-          </Text>
+          {isLoadingProduct ? (
+            <View style={styles.statusContainer}>
+              <ActivityIndicator size="small" color={palette.accent} />
+              <Text style={styles.statusText}>Looking up product...</Text>
+            </View>
+          ) : notFound ? (
+            <View style={styles.statusContainer}>
+              <Ionicons name="alert-circle" size={24} color={palette.warning} />
+              <Text style={styles.statusText}>Product not found</Text>
+              <Text style={styles.statusSubtext}>Try scanning again</Text>
+            </View>
+          ) : (
+            <View style={styles.instructionContainer}>
+              <Text style={styles.instructionText}>
+                Point your camera at a product barcode
+              </Text>
+              <Text style={styles.instructionSubtext}>
+                The scanner will detect it automatically
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
       <Modal
         visible={showProductModal}
-        animationType="slide"
+        animationType="none"
         transparent={true}
         onRequestClose={closeModal}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <Animated.View
+            style={[
+              styles.modalContent,
+              {
+                transform: [
+                  {
+                    translateY: modalSlide.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [600, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <View style={styles.modalHandle} />
             <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
-              <Ionicons name="close" size={28} color={palette.text} />
+              <Ionicons name="close" size={24} color={palette.text} />
             </TouchableOpacity>
 
             {product && (
-              <ScrollView>
-                {product.image && (
-                  <Image source={{ uri: product.image }} style={styles.modalImage} />
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {(product.imageFull || product.image) && (
+                  <Image
+                    source={{ uri: product.imageFull || product.image }}
+                    style={styles.modalImage}
+                    resizeMode="contain"
+                  />
                 )}
 
                 <View style={styles.modalHeader}>
@@ -183,6 +326,9 @@ export default function ScanScreen() {
                     <Text style={styles.modalTitle}>{product.name}</Text>
                     <Text style={styles.modalBrand}>{product.brand}</Text>
                   </View>
+                </View>
+
+                <View style={styles.scoreSection}>
                   <View
                     style={[
                       styles.modalScoreBadge,
@@ -191,43 +337,54 @@ export default function ScanScreen() {
                   >
                     <Text style={styles.modalScoreText}>{product.score}</Text>
                   </View>
+                  <View style={styles.scoreInfo}>
+                    <Text style={styles.scoreLabel}>{getScoreLabel(product.score)} Choice</Text>
+                    <Text style={styles.scoreDescription}>Health Score</Text>
+                  </View>
                 </View>
 
                 <View style={styles.nutrimentSection}>
-                  <Text style={styles.sectionTitle}>Nutrition (per 100g/ml)</Text>
+                  <Text style={styles.sectionTitle}>Nutrition Facts</Text>
+                  <Text style={styles.sectionSubtitle}>Per 100g/ml</Text>
 
                   <View style={styles.nutrimentGrid}>
-                    <NutrimentRow label="Energy" value={product.nutriments.energy} unit="kcal" />
-                    <NutrimentRow label="Fat" value={product.nutriments.fat} unit="g" />
-                    <NutrimentRow label="Saturated Fat" value={product.nutriments.saturatedFat} unit="g" />
-                    <NutrimentRow label="Carbs" value={product.nutriments.carbs} unit="g" />
-                    <NutrimentRow label="Sugar" value={product.nutriments.sugar} unit="g" />
-                    <NutrimentRow label="Protein" value={product.nutriments.protein} unit="g" />
-                    <NutrimentRow label="Fiber" value={product.nutriments.fiber} unit="g" />
-                    <NutrimentRow label="Salt" value={product.nutriments.salt} unit="g" />
+                    <NutrimentRow label="Calories" value={product.nutriments.energy} unit="kcal" icon="flame-outline" />
+                    <NutrimentRow label="Fat" value={product.nutriments.fat} unit="g" icon="water-outline" />
+                    <NutrimentRow label="Saturated" value={product.nutriments.saturatedFat} unit="g" icon="ellipse-outline" indent />
+                    <NutrimentRow label="Carbs" value={product.nutriments.carbs} unit="g" icon="cube-outline" />
+                    <NutrimentRow label="Sugar" value={product.nutriments.sugar} unit="g" icon="cafe-outline" indent />
+                    <NutrimentRow label="Protein" value={product.nutriments.protein} unit="g" icon="barbell-outline" />
+                    <NutrimentRow label="Fiber" value={product.nutriments.fiber} unit="g" icon="leaf-outline" />
+                    <NutrimentRow label="Salt" value={product.nutriments.salt} unit="g" icon="snow-outline" />
                   </View>
                 </View>
 
                 {product.allergens && product.allergens.length > 0 && (
                   <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Allergens</Text>
-                    <Text style={styles.sectionText}>
-                      {product.allergens.map((a) => a.replace("en:", "")).join(", ")}
-                    </Text>
+                    <View style={styles.allergenContainer}>
+                      {product.allergens.map((a, i) => (
+                        <View key={i} style={styles.allergenBadge}>
+                          <Ionicons name="warning-outline" size={14} color={palette.warning} />
+                          <Text style={styles.allergenText}>{a.replace("en:", "")}</Text>
+                        </View>
+                      ))}
+                    </View>
                   </View>
                 )}
 
                 <TouchableOpacity
                   style={[
                     styles.addButton,
-                    isFavorited && { backgroundColor: palette.muted },
+                    isFavorited && styles.addButtonDisabled,
                   ]}
                   onPress={handleAddToFavorites}
                   disabled={isFavorited}
+                  activeOpacity={0.8}
                 >
                   <Ionicons
                     name={isFavorited ? "heart" : "heart-outline"}
-                    size={20}
+                    size={22}
                     color="#FFFFFF"
                   />
                   <Text style={styles.addButtonText}>
@@ -236,14 +393,14 @@ export default function ScanScreen() {
                 </TouchableOpacity>
               </ScrollView>
             )}
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </View>
   );
 }
 
-function NutrimentRow({ label, value, unit }) {
+function NutrimentRow({ label, value, unit, icon, indent }) {
   const formatVal = (v) => {
     const num = Number(v);
     if (Number.isFinite(num)) return `${num.toFixed(1)} ${unit}`;
@@ -251,8 +408,11 @@ function NutrimentRow({ label, value, unit }) {
   };
 
   return (
-    <View style={styles.nutrimentRow}>
-      <Text style={styles.nutrimentLabel}>{label}</Text>
+    <View style={[styles.nutrimentRow, indent && styles.nutrimentRowIndent]}>
+      <View style={styles.nutrimentLeft}>
+        <Ionicons name={icon} size={16} color={indent ? palette.muted : palette.accent} />
+        <Text style={[styles.nutrimentLabel, indent && styles.nutrimentLabelIndent]}>{label}</Text>
+      </View>
       <Text style={styles.nutrimentValue}>{formatVal(value)}</Text>
     </View>
   );
@@ -270,31 +430,68 @@ const styles = StyleSheet.create({
     backgroundColor: palette.bg,
     padding: 32,
   },
-  permissionText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: palette.text,
-    marginTop: 16,
+  permissionIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: palette.accentSoft,
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 24,
+  },
+  permissionTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: palette.text,
+    marginBottom: 8,
     textAlign: "center",
   },
-  button: {
-    backgroundColor: palette.accent,
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 12,
+  permissionText: {
+    fontSize: 15,
+    color: palette.muted,
+    textAlign: "center",
+    marginBottom: 32,
+    lineHeight: 22,
   },
-  buttonText: {
+  permissionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: palette.accent,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 14,
+    gap: 8,
+    ...shadows.card,
+  },
+  permissionButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: palette.muted,
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
   },
   topOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "flex-end",
+    paddingBottom: 20,
+  },
+  topContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  topTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "600",
   },
   middleRow: {
     flexDirection: "row",
@@ -302,7 +499,7 @@ const styles = StyleSheet.create({
   },
   sideOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(0,0,0,0.7)",
   },
   scanArea: {
     width: 250,
@@ -311,8 +508,8 @@ const styles = StyleSheet.create({
   },
   corner: {
     position: "absolute",
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
     borderColor: palette.accent,
   },
   topLeft: {
@@ -320,41 +517,74 @@ const styles = StyleSheet.create({
     left: 0,
     borderTopWidth: 4,
     borderLeftWidth: 4,
-    borderTopLeftRadius: 12,
+    borderTopLeftRadius: 16,
   },
   topRight: {
     top: 0,
     right: 0,
     borderTopWidth: 4,
     borderRightWidth: 4,
-    borderTopRightRadius: 12,
+    borderTopRightRadius: 16,
   },
   bottomLeft: {
     bottom: 0,
     left: 0,
     borderBottomWidth: 4,
     borderLeftWidth: 4,
-    borderBottomLeftRadius: 12,
+    borderBottomLeftRadius: 16,
   },
   bottomRight: {
     bottom: 0,
     right: 0,
     borderBottomWidth: 4,
     borderRightWidth: 4,
-    borderBottomRightRadius: 12,
+    borderBottomRightRadius: 16,
+  },
+  scanLine: {
+    position: "absolute",
+    left: 20,
+    right: 20,
+    height: 3,
+    backgroundColor: palette.accent,
+    borderRadius: 2,
+    shadowColor: palette.accent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
   },
   bottomOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
+    flex: 1.2,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "flex-start",
+    alignItems: "center",
+    paddingTop: 30,
+  },
+  statusContainer: {
+    alignItems: "center",
+    gap: 8,
+  },
+  statusText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  statusSubtext: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 14,
+  },
+  instructionContainer: {
     alignItems: "center",
   },
   instructionText: {
     color: "#FFFFFF",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "600",
     textAlign: "center",
-    paddingHorizontal: 20,
+  },
+  instructionSubtext: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 14,
+    marginTop: 6,
   },
   modalOverlay: {
     flex: 1,
@@ -363,12 +593,20 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: palette.bg,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: "85%",
-    paddingTop: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: "90%",
+    paddingTop: 12,
     paddingHorizontal: 20,
     paddingBottom: 40,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: palette.border,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 16,
   },
   closeButton: {
     position: "absolute",
@@ -384,15 +622,13 @@ const styles = StyleSheet.create({
   },
   modalImage: {
     width: "100%",
-    height: 200,
-    borderRadius: 12,
+    height: 180,
+    borderRadius: 16,
     marginBottom: 20,
     backgroundColor: palette.surface,
   },
   modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 16,
   },
   modalTitleSection: {
     flex: 1,
@@ -407,45 +643,86 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: palette.muted,
   },
+  scoreSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: palette.surface,
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 20,
+    gap: 16,
+  },
   modalScoreBadge: {
     width: 70,
     height: 70,
     borderRadius: 35,
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 16,
   },
   modalScoreText: {
     fontSize: 28,
     fontWeight: "bold",
     color: "#FFFFFF",
   },
+  scoreInfo: {
+    flex: 1,
+  },
+  scoreLabel: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: palette.text,
+  },
+  scoreDescription: {
+    fontSize: 14,
+    color: palette.muted,
+    marginTop: 2,
+  },
   nutrimentSection: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: "700",
     color: palette.text,
+    marginBottom: 2,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: palette.muted,
     marginBottom: 12,
   },
   nutrimentGrid: {
     backgroundColor: palette.card,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: palette.border,
+    borderRadius: 16,
+    padding: 4,
+    ...shadows.card,
   },
   nutrimentRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 8,
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderBottomWidth: 1,
     borderBottomColor: palette.border,
+  },
+  nutrimentRowIndent: {
+    paddingLeft: 36,
+    backgroundColor: palette.surface,
+  },
+  nutrimentLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   nutrimentLabel: {
     fontSize: 15,
     color: palette.text,
+    fontWeight: "500",
+  },
+  nutrimentLabelIndent: {
+    color: palette.muted,
+    fontWeight: "400",
   },
   nutrimentValue: {
     fontSize: 15,
@@ -453,12 +730,28 @@ const styles = StyleSheet.create({
     color: palette.accent,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
-  sectionText: {
-    fontSize: 15,
-    color: palette.text,
-    lineHeight: 22,
+  allergenContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8,
+  },
+  allergenBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(245, 158, 11, 0.1)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6,
+  },
+  allergenText: {
+    fontSize: 13,
+    color: palette.warning,
+    fontWeight: "500",
+    textTransform: "capitalize",
   },
   addButton: {
     backgroundColor: palette.accent,
@@ -466,9 +759,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     marginTop: 8,
-    gap: 8,
+    gap: 10,
+    ...shadows.card,
+  },
+  addButtonDisabled: {
+    backgroundColor: palette.muted,
   },
   addButtonText: {
     color: "#FFFFFF",

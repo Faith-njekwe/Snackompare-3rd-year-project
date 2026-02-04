@@ -1,0 +1,57 @@
+# Blog Entry - January 27, 2026
+**Author:** Daniel Obazuaye
+
+## Building the Foundation: Core Features Implementation
+
+Before Faith implemented the meal calorie estimator and OpenAI-based chatbot, I focused on building the core foundation of the SnacKompare mobile app. This involved implementing the essential features that would allow users to search for and track food products.
+
+### Barcode Scanner Implementation
+
+The first major feature I built was the barcode scanner. This allows users to quickly scan product barcodes and retrieve nutritional information from the Open Food Facts API. I used React Native's camera capabilities to capture barcodes, then integrated with our backend to fetch and display detailed product information including:
+
+- Nutritional values (calories, protein, fat, carbohydrates, etc.)
+- Health scores based on nutritional content
+- Allergen information
+- Ingredient lists
+- Nutri-Score and Eco-Score ratings
+
+One of the challenges was ensuring the camera permissions worked correctly across both iOS and Android platforms, and handling cases where products weren't found in the database.
+
+### Search Products Page
+
+Next, I implemented the search functionality, allowing users to search for products by name. This feature queries the Open Food Facts API and displays results in an intuitive, scrollable list. Each product card shows:
+
+- Product name and brand
+- Product image
+- Health score with color-coded indicators
+- Quick access to detailed nutritional information
+
+I spent time optimizing the search experience to handle empty queries, loading states, and error cases gracefully. The UI needed to be responsive and provide clear feedback to users during searches.
+
+### Favourites System
+
+The favourites page was another critical feature I implemented. This allows users to save products they frequently consume for quick access later. I used AsyncStorage to persist favourites locally on the device, ensuring the data remains available even after closing the app.
+
+Key features of the favourites system include:
+
+- Add/remove products from favourites
+- Persistent storage across app sessions
+- Quick access to saved products
+- Visual indicators showing which products are favourited
+
+### Backend Integration
+
+Throughout this process, I worked on integrating the frontend with our Django backend API. This involved:
+
+- Setting up API endpoints for product searches and barcode lookups
+- Handling authentication and token management
+- Configuring CORS for cross-origin requests
+- Managing environment variables for different deployment environments
+
+### Challenges and Learning
+
+One of the main challenges was managing IP addresses for local testing. Since we were testing on physical devices, I had to ensure both the phone and development machine were on the same network and configure the API base URL correctly. This involved creating environment variable configurations that could easily be updated for different testing scenarios.
+
+I also learned a lot about React Native's navigation system, implementing tab navigation and stack navigation to create a smooth user experience across different screens.
+
+.

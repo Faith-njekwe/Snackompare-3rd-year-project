@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Product, Favorite, MealPlan
+from .models import Product, Favorite, MealPlan, UserProfile
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -31,3 +31,9 @@ class MealPlanSerializer(serializers.ModelSerializer):
   class Meta:
     model = MealPlan
     fields = ["user_id", "profile", "plan", "created_at"]
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+  class Meta:
+    model = UserProfile
+    fields = ["user_id", "name", "diet", "filters", "allergens", "updated_at"]

@@ -36,3 +36,16 @@ class MealPlan(models.Model):
 
   def __str__(self):
     return f"MealPlan for {self.user_id} at {self.created_at}"
+
+
+class UserProfile(models.Model):
+  user_id = models.CharField(max_length=128, unique=True)
+  name = models.CharField(max_length=255, blank=True, default="")
+  diet = models.CharField(max_length=64, blank=True, default="None")
+  filters = models.JSONField(default=dict, blank=True)
+  allergens = models.JSONField(default=list, blank=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+  updated_at = models.DateTimeField(auto_now=True)
+
+  def __str__(self):
+    return f"UserProfile for {self.user_id}"

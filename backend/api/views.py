@@ -5,8 +5,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Favorite, MealPlan, Product
-from .serializers import FavoriteSerializer, MealPlanSerializer, ProductSerializer
+from .models import Favorite, MealPlan, Product, UserProfile
+from .serializers import FavoriteSerializer, MealPlanSerializer, ProductSerializer, UserProfileSerializer
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 from .services import fetch_barcode, fetch_search, generate_meal_plan_llm, get_or_cache_product, health_delta
@@ -56,7 +56,6 @@ class ChatView(APIView):
 
   def post(self, request):
     api_key = os.environ.get("OPENAI_API_KEY")
-    print("KEY LOADED?", bool(api_key))
 
     if not api_key:
       return Response({"error": "OPENAI_API_KEY not set"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -86,7 +85,6 @@ class ChatView(APIView):
       return Response({"aiResponse": ai_text})
 
     except Exception as e:
-      print("OPENAI ERROR:", e)
       return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -184,7 +182,7 @@ class MealPlanView(APIView):
 
 
 class ExplainView(APIView):
-  """Generate a short explanation comparing two products using LLM fallback."""
+  """Generate a short explanation comparing two products using OpenAI."""
 
   def post(self, request):
     base = request.data.get("base")
@@ -202,14 +200,21 @@ class ExplainView(APIView):
       f"Nutrient deltas: {delta}. Focus on sugar, salt, saturated fat, fiber, protein. Include score delta."
     )
 
-    explanation = None
-    try:
-      explanation = generate_meal_plan_llm({"goal": "Explain"}, [])  # reuse LLM wrapper to access OpenAI client
-    except Exception:
-      explanation = None
-
-    if explanation and "raw" in explanation:
-      return Response({"explanation": explanation["raw"]})
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if api_key:
+      try:
+        client = OpenAI(api_key=api_key)
+        resp = client.chat.completions.create(
+          model="gpt-4o-mini",
+          messages=[
+            {"role": "system", "content": "You are a concise nutrition comparison assistant. Respond with bullet points only."},
+            {"role": "user", "content": prompt},
+          ],
+        )
+        explanation = resp.choices[0].message.content
+        return Response({"explanation": explanation})
+      except Exception:
+        pass
 
     # deterministic fallback
     return Response(
@@ -220,6 +225,35 @@ class ExplainView(APIView):
         )
       }
     )
+
+
+class ProfileView(APIView):
+  permission_classes = []
+
+  def get(self, request):
+    user_id = request.query_params.get("user_id")
+    if not user_id:
+      return Response({"error": "user_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+      profile = UserProfile.objects.get(user_id=user_id)
+      return Response(UserProfileSerializer(profile).data)
+    except UserProfile.DoesNotExist:
+      return Response({"user_id": user_id, "name": "", "diet": "None", "filters": {}, "allergens": []})
+
+  def put(self, request):
+    user_id = request.data.get("user_id")
+    if not user_id:
+      return Response({"error": "user_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+    profile, _ = UserProfile.objects.update_or_create(
+      user_id=user_id,
+      defaults={
+        "name": request.data.get("name", ""),
+        "diet": request.data.get("diet", "None"),
+        "filters": request.data.get("filters", {}),
+        "allergens": request.data.get("allergens", []),
+      },
+    )
+    return Response(UserProfileSerializer(profile).data)
 
 
 class RegisterView(APIView):
@@ -262,27 +296,17 @@ class MealPhotoCaloriesView(APIView):
     """
 
     parser_classes = [MultiPartParser, FormParser]
-    permission_classes = [] 
+    permission_classes = []
 
     def post(self, request):
-        """For debugging"""
-        print(f"FILES in request: {request.FILES}")
         image = request.FILES.get("image")
-
-        if image:
-            print(f"Image Found: {image.name}")
-            size_bytes = image.size
-            size_mb = size_bytes / (1024 * 1024)
-            print(f"Image Found: {image.name} | Size: {size_bytes} bytes ({size_mb:.2f} MB)")     
-        else:
-            print("No image found in request.FILES")
 
         if not image:
             return Response(
                 {"error": "image is required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         if image.size > 5 * 1024 * 1024:
             return Response(
                 {
@@ -291,9 +315,8 @@ class MealPhotoCaloriesView(APIView):
                 },
                 status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             )
-        
+
         try:
-            # Read image bytes and pass to vision service
             result = estimate_calories_from_image_bytes(image.read())
 
             return Response(
@@ -318,5 +341,3 @@ class MealPhotoCaloriesView(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
-

@@ -8,8 +8,6 @@ import {
   Image,
   ActivityIndicator,
   Animated,
-  PanResponder,
-  Dimensions,
   Alert,
   RefreshControl,
 } from "react-native";
@@ -20,73 +18,16 @@ import { palette, shadows } from "../theme";
 import { getFavorites, removeFavorite } from "../services/storage";
 import ProductDetailModal from "../components/ProductDetailModal";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const SWIPE_THRESHOLD = -80;
-
-function SwipeableCard({ item, onDelete, onPress, getScoreColor }) {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const itemHeight = useRef(new Animated.Value(1)).current;
-  const opacity = useRef(new Animated.Value(1)).current;
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dy) < 20;
-      },
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dx < 0) {
-          translateX.setValue(Math.max(gestureState.dx, -100));
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx < SWIPE_THRESHOLD) {
-          // Show delete confirmation
-          Animated.spring(translateX, {
-            toValue: -100,
-            useNativeDriver: true,
-          }).start();
-        } else {
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
-        }
-      },
-    })
-  ).current;
-
+function FavouriteCard({ item, onDelete, onPress, getScoreColor }) {
   const handleDelete = () => {
     Alert.alert(
       "Remove Favourite",
       `Remove "${item.name}" from favourites?`,
       [
-        {
-          text: "Cancel",
-          onPress: () => {
-            Animated.spring(translateX, {
-              toValue: 0,
-              useNativeDriver: true,
-            }).start();
-          },
-          style: "cancel",
-        },
+        { text: "Cancel", style: "cancel" },
         {
           text: "Remove",
-          onPress: () => {
-            // Animate out
-            Animated.parallel([
-              Animated.timing(itemHeight, {
-                toValue: 0,
-                duration: 200,
-                useNativeDriver: false,
-              }),
-              Animated.timing(opacity, {
-                toValue: 0,
-                duration: 200,
-                useNativeDriver: true,
-              }),
-            ]).start(() => onDelete(item.id));
-          },
+          onPress: () => onDelete(item.id),
           style: "destructive",
         },
       ]
@@ -94,69 +35,52 @@ function SwipeableCard({ item, onDelete, onPress, getScoreColor }) {
   };
 
   return (
-    <Animated.View
-      style={[
-        styles.swipeContainer,
-        {
-          opacity,
-          transform: [{ scaleY: itemHeight }],
-        },
-      ]}
-    >
-      <View style={styles.deleteAction}>
-        <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-          <Ionicons name="trash-outline" size={24} color="#FFFFFF" />
-          <Text style={styles.deleteText}>Delete</Text>
-        </TouchableOpacity>
-      </View>
-
-      <Animated.View
-        style={[styles.cardWrapper, { transform: [{ translateX }] }]}
-        {...panResponder.panHandlers}
+    <View style={styles.cardWrapper}>
+      <TouchableOpacity
+        style={styles.productCard}
+        onPress={() => onPress(item)}
+        activeOpacity={0.9}
       >
-        <TouchableOpacity
-          style={styles.productCard}
-          onPress={() => onPress(item)}
-          activeOpacity={0.9}
-        >
-          {item.image ? (
-            <Image
-              source={{ uri: item.image }}
-              style={styles.productImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={styles.placeholderImage}>
-              <Ionicons name="nutrition-outline" size={28} color={palette.muted} />
+        {item.image ? (
+          <Image
+            source={{ uri: item.image }}
+            style={styles.productImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.placeholderImage}>
+            <Ionicons name="nutrition-outline" size={28} color={palette.muted} />
+          </View>
+        )}
+        <View style={styles.productInfo}>
+          <Text style={styles.productName} numberOfLines={2}>
+            {item.name}
+          </Text>
+          <Text style={styles.productBrand} numberOfLines={1}>
+            {item.brand || "Unknown brand"}
+          </Text>
+          {item.category && (
+            <View style={styles.categoryBadge}>
+              <Text style={styles.productCategory}>{item.category}</Text>
             </View>
           )}
-          <View style={styles.productInfo}>
-            <Text style={styles.productName} numberOfLines={2}>
-              {item.name}
-            </Text>
-            <Text style={styles.productBrand} numberOfLines={1}>
-              {item.brand || "Unknown brand"}
-            </Text>
-            {item.category && (
-              <View style={styles.categoryBadge}>
-                <Text style={styles.productCategory}>{item.category}</Text>
-              </View>
-            )}
+        </View>
+        <View style={styles.rightSection}>
+          <View
+            style={[
+              styles.scoreBadge,
+              { backgroundColor: getScoreColor(item.score) },
+            ]}
+          >
+            <Text style={styles.scoreText}>{item.score}</Text>
           </View>
-          <View style={styles.rightSection}>
-            <View
-              style={[
-                styles.scoreBadge,
-                { backgroundColor: getScoreColor(item.score) },
-              ]}
-            >
-              <Text style={styles.scoreText}>{item.score}</Text>
-            </View>
-            <Ionicons name="heart" size={20} color={palette.danger} style={styles.heartIcon} />
-          </View>
+          <Ionicons name="heart" size={20} color={palette.danger} style={styles.heartIcon} />
+        </View>
+        <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn}>
+          <Ionicons name="trash-outline" size={18} color={palette.text} />
         </TouchableOpacity>
-      </Animated.View>
-    </Animated.View>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -240,7 +164,7 @@ export default function FavouritesScreen() {
             <Text style={styles.countText}>
               {favourites.length} {favourites.length === 1 ? "favourite" : "favourites"}
             </Text>
-            <Text style={styles.hintText}>Swipe left to delete</Text>
+            <Text style={styles.hintText}>Tap trash to remove</Text>
           </View>
         )}
 
@@ -271,7 +195,7 @@ export default function FavouritesScreen() {
                 ],
               }}
             >
-              <SwipeableCard
+              <FavouriteCard
                 item={item}
                 onDelete={handleRemoveFavorite}
                 onPress={handleProductPress}
@@ -343,35 +267,15 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
-  swipeContainer: {
-    marginBottom: 12,
-    overflow: "hidden",
-  },
-  deleteAction: {
-    position: "absolute",
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: 100,
-    backgroundColor: palette.danger,
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  deleteButton: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  deleteText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: 4,
-  },
   cardWrapper: {
+    marginBottom: 12,
     backgroundColor: palette.card,
     borderRadius: 16,
     ...shadows.card,
+  },
+  deleteBtn: {
+    padding: 8,
+    marginLeft: 6,
   },
   productCard: {
     flexDirection: "row",

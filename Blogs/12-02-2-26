@@ -1,0 +1,14 @@
+# Blog Entry - February 12, 2026
+**Author:** Daniel Obazuaye
+
+## Syncing favourites to Firestore
+I wired our favourites flow to Firestore so saved items follow you between devices. The storage helper now writes every favourite to the signed-in user’s collection and, on login, merges cloud and local lists without creating duplicates. If you’re offline, favourites stay in AsyncStorage and sync up automatically the next time you authenticate.
+
+## Calorie counter updates
+I tightened up the calorie tracker so totals include photo-based estimates from the meal scanner. The tracker now shows goal progress, remaining calories, and clearly separates manual entries from the calories pushed in via the `CalorieTotalContext`. Inputs are number-only, add/remove rows are smoother, and the progress ring warns when you pass your goal.
+
+## Chat/API base fix
+The diet coach screen now pulls its base URL from `config.js` (`API_BASE_URL`) instead of hardcoding my local IP. This prevents “network error” failures when switching between Railway and local backends and keeps chat history flowing after deployments.
+
+## User profiles API
+On the backend I added a `UserProfile` model plus serializer and REST endpoint so we can store diet, filters, allergens, and name for each user. The profile route returns defaults when a profile doesn’t exist and accepts updates via PUT, which sets us up for personalised recommendations across the app. I also cleaned the ExplainView fallback and removed leftover debug prints.

@@ -87,41 +87,198 @@ export async function getProductByBarcode(barcode) {
  * @param {Object} product - Raw product data from Open Food Facts
  * @returns {Object} Cleaned product data
  */
-export function cleanProduct(product) {
-  if (!product) {
-    return null;
+
+
+function kcalToKj(kcal) {
+  return (kcal || 0) * 4.184;
+}
+
+function saltGToSodiumMg(saltG) {
+  // sodium (mg) = salt(g) * 400
+  return (saltG || 0) * 400.0;
+}
+
+/* Nutri-score bins */
+
+const ENERGY_KJ_THRESH = [335, 670, 1005, 1340, 1675, 2010, 2345, 2680, 3015, 3350];
+const SUGARS_G_THRESH  = [4.5, 9, 13.5, 18, 22.5, 27, 31, 36, 40, 45];
+const SATFAT_G_THRESH  = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const SODIUM_MG_THRESH = [90, 180, 270, 360, 450, 540, 630, 720, 810, 900];
+
+const FIBER_G_THRESH   = [0.9, 1.9, 2.8, 3.7, 4.7]; // 0..5
+const PROTEIN_G_THRESH = [1.6, 3.2, 4.8, 6.4, 8.0]; // 0..5
+
+// Beverages specific
+const BEV_ENERGY_KJ_THRESH = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270];
+const BEV_SUGARS_G_THRESH  = [0, 0.5, 2, 3.5, 5, 6, 7, 8, 9, 10];
+
+// Fats specific (sat fat / total fat ratio %)
+const FAT_RATIO_THRESH = [10, 16, 22, 28, 34, 40, 46, 52, 58, 64];
+
+function pointsFromThresholds(value, thresholds) {
+  const v = value || 0;
+  for (let i = 0; i < thresholds.length; i++) {
+    if (v <= thresholds[i]) return i;
+  }
+  return thresholds.length;
+}
+
+function computeNutriPoints(n, category = "General") {
+  // Negative points (A)
+  let energyPts, sugarPts;
+
+  if (category === "Beverages") {
+    energyPts = pointsFromThresholds(n.energy_kj, BEV_ENERGY_KJ_THRESH);
+    sugarPts  = pointsFromThresholds(n.sugar, BEV_SUGARS_G_THRESH);
+  } else {
+    energyPts = pointsFromThresholds(n.energy_kj, ENERGY_KJ_THRESH);
+    sugarPts  = pointsFromThresholds(n.sugar, SUGARS_G_THRESH);
   }
 
-  const nutriments = product.nutriments || {};
+  // Fat logic
+  let fatPts;
+  if (category === "Fats") {
+    const totalFat = n.fat || 1;
+    const satFat = n.saturatedFat || 0;
+    const ratio = (satFat / totalFat) * 100;
+    fatPts = pointsFromThresholds(ratio, FAT_RATIO_THRESH);
+  } else {
+    fatPts = pointsFromThresholds(n.saturatedFat, SATFAT_G_THRESH);
+  }
 
-  // Prefer smaller images for faster loading in lists
+  const sodiumPts = pointsFromThresholds(n.sodium_mg, SODIUM_MG_THRESH);
+
+  const A = energyPts + sugarPts + fatPts + sodiumPts;
+
+  // Positive points (C)
+  const fiberPts = Math.min(5, pointsFromThresholds(n.fiber, FIBER_G_THRESH));
+  const proteinPts = Math.min(5, pointsFromThresholds(n.protein, PROTEIN_G_THRESH));
+
+  let vPoints = 0;
+  if (category === "FruitVeg") {
+    vPoints = 5;
+  } else if ((n.fiber || 0) > 4.7) {
+    vPoints = 5;
+  }
+
+  let useProtein = true;
+  if (category === "Cheese") {
+    useProtein = true;
+  } else if (A >= 11 && fiberPts < 5) {
+    useProtein = false;
+  }
+
+  const C = fiberPts + vPoints + (useProtein ? proteinPts : 0);
+
+  return A - C; // lower is better
+ }
+
+ /**
+ * Compute health score based on Nutri-Score–style system
+ * @param {Object} nutriments - standardized nutriments (must include energy_kj + sodium_mg)
+ * @param {string} categoryMapped - one of: Beverages, Cheese, FruitVeg, Fats, General
+ */
+
+export function computeHealthScore(nutriments, categoryMapped = "General") {
+  if (!nutriments) return 0;
+  const points = computeNutriPoints(nutriments, categoryMapped);
+  return nutriPointsToScore(points);
+}
+
+function nutriPointsToScore(points) {
+  const MIN_P = -15;
+  const MAX_P = 40;
+
+  const p = Math.max(MIN_P, Math.min(MAX_P, points));
+  const score = (100 * (MAX_P - p)) / (MAX_P - MIN_P);
+  return Math.round(score);
+}
+
+function mapCategoryForNutriScore(product) {
+  const rawCategories = product?.categories_tags || [];
+  const cats = rawCategories.map((c) => (c || "").toLowerCase());
+
+  // tag matches
+  if (cats.some((c) => c.includes("beverage"))) return "Beverages";
+  if (
+    cats.some((c) =>
+      c.includes("en:waters") ||
+      c.includes("en:soft-drinks") ||
+      c.includes("en:sodas") ||
+      c.includes("en:carbonated-drinks") ||
+      c.includes("en:juices") ||
+      c.includes("en:fruit-juices") ||
+      c.includes("en:tea") ||
+      c.includes("en:coffee") ||
+      c.includes("en:milks")
+    )
+  ) return "Beverages";
+  if (cats.some((c) => c.includes("cheese"))) return "Cheese";
+  if (cats.some((c) =>
+      ["en:fruits", "en:vegetables", "en:nuts", "en:legumes"].includes(c)
+    )) return "FruitVeg";
+  if (cats.some((c) => ["en:fats", "en:sauces", "en:oils"].includes(c)))
+    return "Fats";
+
+  return "General";
+}
+
+
+
+
+export function cleanProduct(product) {
+  if (!product) return null;
+
+  const n = product.nutriments || {};
+
   const thumbnailImage = product.image_front_small_url || product.image_front_thumb_url;
   const fullImage = product.image_url || product.image_front_url;
 
+  // OFF typically has:
+  // - energy_100g is kJ
+  // - energy-kcal_100g is kcal
+  const kcal = n["energy-kcal_100g"] ?? n.energy_kcal ?? null;
+  const kj = n.energy_100g ?? null;
+
+  const energy_kj = kj != null ? kj : kcalToKj(kcal);
+  const energy_kcal = kcal != null ? kcal : (energy_kj / 4.184);
+
+  const salt_g = n.salt_100g ?? 0;
+
+  const categoryMapped = mapCategoryForNutriScore(product);
+
   return {
-    code: product.code || product.id || "",
-    name: product.product_name || "Unknown Product",
-    brand: product.brands || "Unknown Brand",
+    code: product.code || product.id || "", 
+    name: product.product_name || "Unknown Product", 
+    brand: product.brands || "Unknown Brand", 
     category: getCategory(product),
-    image: thumbnailImage || fullImage || null,
-    imageFull: fullImage || thumbnailImage || null,
-    nutriments: {
-      energy: nutriments["energy-kcal_100g"] || nutriments.energy_100g || 0,
-      fat: nutriments.fat_100g || 0,
-      saturatedFat: nutriments["saturated-fat_100g"] || 0,
-      carbs: nutriments.carbohydrates_100g || 0,
-      sugar: nutriments.sugars_100g || 0,
-      protein: nutriments.proteins_100g || 0,
-      fiber: nutriments.fiber_100g || 0,
-      salt: nutriments.salt_100g || 0,
-    },
-    additives: product.additives_tags || [],
-    allergens: product.allergens_tags || [],
-    ingredients: product.ingredients_text || "",
-    ecoscore: product.ecoscore_grade || "",
-    nutriscore: product.nutriscore_grade || "",
-  };
-}
+    categoryMapped,
+    image: thumbnailImage || fullImage || null, 
+    imageFull: fullImage || thumbnailImage || null, 
+    nutriments: { 
+      energy: energy_kcal ?? null,
+      energy_kj: energy_kj ?? null,  
+      sodium_mg: saltGToSodiumMg(salt_g),
+      fat: n.fat_100g ?? 0,
+      saturatedFat: n["saturated-fat_100g"] ?? 0,
+      carbs: n.carbohydrates_100g ?? 0,
+      sugar: n.sugars_100g ?? 0,
+      protein: n.proteins_100g ?? 0,
+      fiber: n.fiber_100g ?? 0,
+      salt: n.salt_100g ?? 0,
+    }, 
+
+    //if the backend injects it, keep it
+    health_score: typeof product.health_score === "number" ? product.health_score : undefined,
+    additives: product.additives_tags || [], 
+    allergens: product.allergens_tags || [], 
+    ingredients: product.ingredients_text || "", 
+    ecoscore: product.ecoscore_grade || "", 
+    nutriscore: product.nutriscore_grade || "", 
+
+  }; 
+
+} 
 
 /**
  * Get category from product data
@@ -135,194 +292,19 @@ function getCategory(product) {
 }
 
 /**
- * Determine if product is a beverage based on category
- */
-function isBeverage(category) {
-  const beverageKeywords = [
-    "drink",
-    "beverage",
-    "juice",
-    "soda",
-    "water",
-    "tea",
-    "coffee",
-    "smoothie",
-    "milk",
-    "shake",
-  ];
-  const catLower = (category || "").toLowerCase();
-  return beverageKeywords.some((keyword) => catLower.includes(keyword));
-}
-
-/**
  * Compute health score for BEVERAGES (stricter on sugar)
  * @param {Object} nutriments - Nutritional values
  * @returns {number} Health score (0-100)
  */
-function computeBeverageScore(nutriments) {
-  // Start at 90 (beverages should be naturally healthy like water)
-  let score = 90;
-
-  // SUGAR - Major penalty for beverages (should be near 0)
-  const sugar = nutriments.sugar || 0;
-  if (sugar > 15) {
-    score -= 50; // Very high sugar (sodas)
-  } else if (sugar > 10) {
-    score -= 35; // High sugar (sweetened juices)
-  } else if (sugar > 5) {
-    score -= 20; // Moderate sugar
-  } else if (sugar > 2.5) {
-    score -= 10; // Low sugar
-  }
-  // 0-2.5g sugar: no penalty (natural/unsweetened)
-
-  // SALT - Should be minimal in drinks
-  const salt = nutriments.salt || 0;
-  if (salt > 0.5) {
-    score -= 30; // Way too much salt for a drink
-  } else if (salt > 0.2) {
-    score -= 15;
-  } else if (salt > 0.1) {
-    score -= 5;
-  }
-
-  // CALORIES - Low calorie is better for drinks
-  const energy = nutriments.energy || 0;
-  if (energy > 200) {
-    score -= 20; // Very high calorie drinks
-  } else if (energy > 100) {
-    score -= 10;
-  } else if (energy > 50) {
-    score -= 5;
-  }
-
-  // PROTEIN BOOST - Good for protein shakes/milk
-  const protein = nutriments.protein || 0;
-  if (protein > 10) {
-    score += 15;
-  } else if (protein > 5) {
-    score += 10;
-  } else if (protein > 2) {
-    score += 5;
-  }
-
-  // Ensure score stays in range
-  return Math.max(5, Math.min(100, Math.round(score)));
-}
-
-/**
- * Compute health score for FOOD (balanced approach)
- * @param {Object} nutriments - Nutritional values
- * @returns {number} Health score (0-100)
- */
-function computeFoodScore(nutriments) {
-  // Start at 75 (neutral baseline for food)
-  let score = 75;
-
-  // SUGAR - Moderate penalty (some sugar is okay in food)
-  const sugar = nutriments.sugar || 0;
-  if (sugar > 40) {
-    score -= 40; // Candy/desserts
-  } else if (sugar > 25) {
-    score -= 25; // Sweet snacks
-  } else if (sugar > 15) {
-    score -= 15; // Moderately sweet
-  } else if (sugar > 10) {
-    score -= 8;
-  } else if (sugar > 5) {
-    score -= 3;
-  }
-
-  // SALT - Important factor
-  const salt = nutriments.salt || 0;
-  if (salt > 2.5) {
-    score -= 35; // Very salty (chips, processed foods)
-  } else if (salt > 1.5) {
-    score -= 25;
-  } else if (salt > 1.0) {
-    score -= 15;
-  } else if (salt > 0.5) {
-    score -= 8;
-  }
-
-  // SATURATED FAT - Moderate penalty
-  const satFat = nutriments.saturatedFat || 0;
-  if (satFat > 15) {
-    score -= 25; // Very high (fried foods)
-  } else if (satFat > 10) {
-    score -= 18;
-  } else if (satFat > 5) {
-    score -= 10;
-  } else if (satFat > 3) {
-    score -= 5;
-  }
-
-  // FIBER BOOST - Very important
-  const fiber = nutriments.fiber || 0;
-  if (fiber > 15) {
-    score += 25; // Excellent fiber content
-  } else if (fiber > 10) {
-    score += 20;
-  } else if (fiber > 7) {
-    score += 15;
-  } else if (fiber > 5) {
-    score += 10;
-  } else if (fiber > 3) {
-    score += 5;
-  }
-
-  // PROTEIN BOOST - Important for satiety
-  const protein = nutriments.protein || 0;
-  if (protein > 30) {
-    score += 20; // High protein foods
-  } else if (protein > 20) {
-    score += 15;
-  } else if (protein > 15) {
-    score += 12;
-  } else if (protein > 10) {
-    score += 8;
-  } else if (protein > 5) {
-    score += 4;
-  }
-
-  // ENERGY - Penalty for excessive calories
-  const energy = nutriments.energy || 0;
-  if (energy > 600) {
-    score -= 15; // Very high calorie density
-  } else if (energy > 500) {
-    score -= 10;
-  } else if (energy > 400) {
-    score -= 5;
-  }
-
-  // Ensure score stays in range
-  return Math.max(5, Math.min(100, Math.round(score)));
-}
-
-/**
- * Compute health score based on nutritional values and category
- * @param {Object} nutriments - Nutritional values
- * @param {string} category - Product category
- * @returns {number} Health score (0-100)
- */
-export function computeHealthScore(nutriments, category = "") {
-  if (!nutriments) {
-    return 50;
-  }
-
-  // Use different algorithms for beverages vs food
-  if (isBeverage(category)) {
-    return computeBeverageScore(nutriments);
-  } else {
-    return computeFoodScore(nutriments);
-  }
-}
+/*
 
 /**
  * Format product for display in the app
  * @param {Object} rawProduct - Raw product data from Open Food Facts
  * @returns {Object} Formatted product for app use
  */
+
+
 /**
  * Search for healthier alternatives in the same category
  * @param {string} category - Product category
@@ -371,11 +353,9 @@ export async function findHealthierAlternatives(category, currentScore, excludeI
 
 export function formatProductForApp(rawProduct) {
   const cleaned = cleanProduct(rawProduct);
-  if (!cleaned) {
-    return null;
-  }
+  if (!cleaned) return null;
 
-  const score = computeHealthScore(cleaned.nutriments, cleaned.category);
+  let score = computeHealthScore(cleaned.nutriments, cleaned.categoryMapped);
 
   return {
     id: cleaned.code,

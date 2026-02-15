@@ -5,12 +5,12 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  Image,
   ScrollView,
   Animated,
   Vibration,
   ActivityIndicator,
 } from "react-native";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { palette, shadows } from "../theme";
 import { addFavorite, isFavorite } from "../services/storage";
@@ -126,9 +126,10 @@ export default function ProductDetailModal({ visible, product, onClose }) {
             <ScrollView showsVerticalScrollIndicator={false}>
               {(selectedAlternative.imageFull || selectedAlternative.image) && (
                 <Image
-                  source={{ uri: selectedAlternative.imageFull || selectedAlternative.image }}
+                  source={selectedAlternative.imageFull || selectedAlternative.image}
                   style={styles.modalImage}
-                  resizeMode="contain"
+                  contentFit="contain"
+                  transition={200}
                 />
               )}
 
@@ -207,9 +208,10 @@ export default function ProductDetailModal({ visible, product, onClose }) {
           <ScrollView showsVerticalScrollIndicator={false}>
             {(product.imageFull || product.image) && (
               <Image
-                source={{ uri: product.imageFull || product.image }}
+                source={product.imageFull || product.image}
                 style={styles.modalImage}
-                resizeMode="contain"
+                contentFit="contain"
+                transition={200}
               />
             )}
 
@@ -291,7 +293,7 @@ export default function ProductDetailModal({ visible, product, onClose }) {
                         activeOpacity={0.7}
                       >
                         {alt.image ? (
-                          <Image source={{ uri: alt.image }} style={styles.alternativeImage} />
+                          <Image source={alt.image} style={styles.alternativeImage} />
                         ) : (
                           <View style={styles.alternativePlaceholder}>
                             <Ionicons name="nutrition-outline" size={20} color={palette.muted} />

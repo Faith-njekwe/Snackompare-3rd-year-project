@@ -4,12 +4,12 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Image,
   TouchableOpacity,
   Animated,
   Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { palette, shadows } from "../theme";
 
@@ -219,9 +219,10 @@ export default function CompareProductsScreen({ route, navigation }) {
 
               {product.image ? (
                 <Image
-                  source={{ uri: product.image }}
+                  source={product.image}
                   style={styles.productImage}
-                  resizeMode="contain"
+                  contentFit="contain"
+                  transition={200}
                 />
               ) : (
                 <View style={styles.placeholderImage}>

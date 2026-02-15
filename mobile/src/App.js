@@ -3,19 +3,21 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
-import { Platform } from "react-native";
+import { Platform, ActivityIndicator, View } from "react-native";
 
+import AuthScreen from "./screens/AuthScreen";
 import HomeScreen from "./screens/HomeScreen";
 import SearchProductsScreen from "./screens/SearchProductsScreen";
 import CompareProductsScreen from "./screens/CompareProductsScreen";
 import FavouritesScreen from "./screens/FavouritesScreen";
-import ProfileScreen from "./screens/ProfileScreen";
+import SettingsScreen from "./screens/SettingsScreen";
 import AIChatbotScreen from "./screens/AIChatbotScreen";
 import TakePhotoScreen from "./screens/TakePhotoScreen";
 import MealPhotoCameraScreen from "./screens/MealPhotoCameraScreen";
 import CalorieCountScreen from "./screens/CalorieCountScreen";
 import ScanScreen from "./screens/ScanScreen";
 import { CalorieTotalProvider } from "./context/CalorieTotalContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { palette } from "./theme";
 
 const Tab = createBottomTabNavigator();
@@ -163,16 +165,48 @@ function HomeStack() {
           headerShadowVisible: false,
         }}
       />
+      <Stack.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{
+          title: "Profile",
+          headerStyle: { backgroundColor: palette.card },
+          headerTintColor: palette.text,
+          headerShadowVisible: false,
+        }}
+      />
     </Stack.Navigator>
+  );
+}
+
+function AppContent() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: palette.bg }}>
+        <ActivityIndicator size="large" color={palette.accent} />
+      </View>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreen />;
+  }
+
+  return (
+    <NavigationContainer>
+      <TabNavigator />
+    </NavigationContainer>
   );
 }
 
 export default function App() {
   return (
-    <CalorieTotalProvider>
-      <NavigationContainer>
-        <TabNavigator />
-      </NavigationContainer>
-    </CalorieTotalProvider>
+    <AuthProvider>
+      <CalorieTotalProvider>
+        <AppContent />
+      </CalorieTotalProvider>
+    </AuthProvider>
   );
 }

@@ -6,12 +6,12 @@ import {
   TextInput,
   FlatList,
   TouchableOpacity,
-  Image,
   Keyboard,
   RefreshControl,
   Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { palette, shadows } from "../theme";
 import { searchProducts, formatProductForApp } from "../services/openFoodFacts";
@@ -235,10 +235,10 @@ export default function SearchProductsScreen({ navigation }) {
               )}
               {getImageSource(item.image, item.id) ? (
                 <Image
-                  source={getImageSource(item.image, item.id)}
+                  source={getImageSource(item.image, item.id)?.uri}
                   style={styles.productImage}
-                  resizeMode="cover"
-                  progressiveRenderingEnabled
+                  contentFit="cover"
+                  transition={200}
                   onError={() => markImageError(item.id)}
                 />
               ) : (
@@ -317,7 +317,7 @@ export default function SearchProductsScreen({ navigation }) {
               activeOpacity={0.7}
             >
               {product.image ? (
-                <Image source={{ uri: product.image }} style={styles.chipImage} />
+                <Image source={product.image} style={styles.chipImage} />
               ) : (
                 <View style={styles.chipImagePlaceholder}>
                   <Ionicons name="nutrition-outline" size={14} color={palette.muted} />

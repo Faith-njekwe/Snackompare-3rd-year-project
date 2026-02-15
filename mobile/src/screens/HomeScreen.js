@@ -17,7 +17,13 @@ export default function HomeScreen({ navigation }) {
       contentContainerStyle={styles.scrollContent}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>SnacKompare</Text>
+        <View style={styles.headerRow}>
+          <View style={{ width: 36 }} />
+          <Text style={styles.title}>SnacKompare</Text>
+          <TouchableOpacity onPress={() => navigation.navigate("Settings")}>
+            <Ionicons name="person-circle-outline" size={36} color={palette.text} />
+          </TouchableOpacity>
+        </View>
         <Text style={styles.subtitle}>
           Make healthier food choices with AI-powered nutrition insights
         </Text>
@@ -143,7 +149,14 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     alignItems: "center",
   },
-  title: { fontSize: 32, fontWeight: "800", color: palette.text, marginBottom: 6, textAlign: "center" },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    marginBottom: 6,
+  },
+  title: { fontSize: 32, fontWeight: "800", color: palette.text },
   subtitle: {
     fontSize: 15,
     color: palette.muted,

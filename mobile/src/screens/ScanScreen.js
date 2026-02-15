@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Modal,
-  Image,
   ScrollView,
   Animated,
   Easing,
@@ -14,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Camera, useCameraDevice, useCodeScanner } from "react-native-vision-camera";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { palette, shadows } from "../theme";
 import { getProductByBarcode, formatProductForApp } from "../services/openFoodFacts";
@@ -315,9 +315,10 @@ export default function ScanScreen() {
               <ScrollView showsVerticalScrollIndicator={false}>
                 {(product.imageFull || product.image) && (
                   <Image
-                    source={{ uri: product.imageFull || product.image }}
+                    source={product.imageFull || product.image}
                     style={styles.modalImage}
-                    resizeMode="contain"
+                    contentFit="contain"
+                    transition={200}
                   />
                 )}
 

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,19 +14,26 @@ import { Ionicons } from "@expo/vector-icons";
 import { palette } from "../theme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { API_BASE_URL } from "../config";
+import { getChatHistory, saveChatHistory } from "../services/storage";
+
+const welcomeMsg = {
+  id: "welcome",
+  role: "assistant",
+  text: "Hi! I'm your nutrition coach! 🥗\n\nTell me your goal, your height and weight, activity level, and any conditions (e.g., diabetes, celiac, allergies), and I'll help you build a plan.",
+};
 
 export default function DietChatScreen() {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState([
-    {
-      id: "welcome",
-      role: "assistant",
-      text:
-        "Hi! I'm your nutrition coach! 🥗\n\nTell me your goal, your height and weight, activity level, and any conditions (e.g., diabetes, celiac, allergies), and I'll help you build a plan.",
-    },
-  ]);
+  const [messages, setMessages] = useState([welcomeMsg]);
   const [isSending, setIsSending] = useState(false);
   const scrollRef = useRef(null);
+
+  useEffect(() => {
+    (async () => {
+      const saved = await getChatHistory();
+      if (saved?.length) setMessages(saved);
+    })();
+  }, []);
 
 // used API_BASE_URL from config.js so as to not hardcode the URL here (hosted on railway)
   const API_URL = `${API_BASE_URL}/api/chat/`;
@@ -70,10 +77,14 @@ export default function DietChatScreen() {
         return;
       }
 
-      setMessages((prev) => [
-        ...prev,
-        { id: String(Date.now() + 2), role: "assistant", text: data.aiResponse || "(no response)" },
-      ]);
+      setMessages((prev) => {
+        const updated = [
+          ...prev,
+          { id: String(Date.now() + 2), role: "assistant", text: data.aiResponse || "(no response)" },
+        ];
+        saveChatHistory(updated);
+        return updated;
+      });
     } catch (e) {
       setMessages((prev) => [
         ...prev,
@@ -89,7 +100,7 @@ export default function DietChatScreen() {
   <KeyboardAvoidingView
   style={styles.container}
   behavior={Platform.OS === "ios" ? "padding" : undefined}
-  keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
+  keyboardVerticalOffset={Platform.OS === "ios" ? 95 : 0}
 >
   <View style={styles.innerContainer}>
 
@@ -170,7 +181,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
     paddingHorizontal: 4,
     marginBottom: 6,
   },

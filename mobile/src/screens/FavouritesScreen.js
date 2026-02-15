@@ -5,13 +5,13 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
   Animated,
   Alert,
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { palette, shadows } from "../theme";
@@ -43,9 +43,10 @@ function FavouriteCard({ item, onDelete, onPress, getScoreColor }) {
       >
         {item.image ? (
           <Image
-            source={{ uri: item.image }}
+            source={item.image}
             style={styles.productImage}
-            resizeMode="cover"
+            contentFit="cover"
+            transition={200}
           />
         ) : (
           <View style={styles.placeholderImage}>

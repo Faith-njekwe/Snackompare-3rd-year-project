@@ -15,9 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { palette } from "../theme";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const CHAT_HISTORY_KEY = "@snackompare_chat_history";
+import { getChatHistory, saveChatHistory, getProfile } from "../services/storage";
 
 const AssistantScreen = () => {
   const [messages, setMessages] = useState([
@@ -32,33 +30,19 @@ const AssistantScreen = () => {
   const [userPrefs, setUserPrefs] = useState({ diet: "None", filters: {}, allergens: [] });
   const scrollViewRef = useRef(null);
 
-  // Load chat history
+  // Load chat history and profile prefs
   useEffect(() => {
     (async () => {
       try {
-        const historyJson = await AsyncStorage.getItem(CHAT_HISTORY_KEY);
-        if (historyJson) {
-          const history = JSON.parse(historyJson);
-          if (history.length) setMessages(history);
-        }
-        const prefsJson = await AsyncStorage.getItem("profilePrefs");
-        if (prefsJson) setUserPrefs(JSON.parse(prefsJson));
+        const history = await getChatHistory();
+        if (history?.length) setMessages(history);
+        const prefs = await getProfile();
+        if (prefs) setUserPrefs(prefs);
       } catch (err) {
         console.error("Error loading chat history:", err);
       }
     })();
   }, []);
-
-  // Save chat history
-  const saveChatHistory = async (msgs) => {
-    try {
-      // Keep only last 20 messages
-      const toSave = msgs.slice(-20);
-      await AsyncStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(toSave));
-    } catch (err) {
-      console.error("Error saving chat history:", err);
-    }
-  };
 
   // Scroll to bottom (only when a new message is added)
   const scrollToBottom = (animated = true) => {
@@ -216,7 +200,7 @@ const AssistantScreen = () => {
       text: "Hey 👋 I'm your SnacKompare nutrition assistant. Ask me anything about healthy eating, nutrition, or food choices! ✨",
     };
     setMessages([initialMsg]);
-    await AsyncStorage.removeItem(CHAT_HISTORY_KEY);
+    await saveChatHistory([initialMsg]);
   };
 
   // Memoized message component with slide-in animation

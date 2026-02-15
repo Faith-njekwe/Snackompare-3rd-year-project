@@ -1,11 +1,43 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { auth, db } from "./firebase";
+import {
+  doc,
+  collection,
+  getDocs,
+  setDoc,
+  deleteDoc,
+  writeBatch,
+  getDoc,
+} from "firebase/firestore";
 
 const FAVORITES_KEY = "@snackompare_favorites";
+const PROFILE_KEY = "profilePrefs";
+const CHAT_HISTORY_KEY = "@snackompare_chat_history";
 
-/**
- * Get all favorite products
- * @returns {Promise<Array>} Array of favorite products
- */
+// --------------- helpers ---------------
+
+function getUid() {
+  return auth.currentUser?.uid ?? null;
+}
+
+function userDoc() {
+  const uid = getUid();
+  return uid ? doc(db, "users", uid) : null;
+}
+
+function minimalProduct(product) {
+  return {
+    id: product.id,
+    name: product.name ?? "",
+    brand: product.brand ?? "",
+    score: product.score ?? null,
+    image: product.image ?? null,
+    category: product.category ?? "",
+  };
+}
+
+// --------------- Favourites ---------------
+
 export async function getFavorites() {
   try {
     const jsonValue = await AsyncStorage.getItem(FAVORITES_KEY);
@@ -16,23 +48,21 @@ export async function getFavorites() {
   }
 }
 
-/**
- * Add a product to favorites
- * @param {Object} product - Product to add
- * @returns {Promise<boolean>} Success status
- */
 export async function addFavorite(product) {
   try {
     const favorites = await getFavorites();
-
-    // Check if already exists
     const exists = favorites.some((fav) => fav.id === product.id);
-    if (exists) {
-      return false;
-    }
+    if (exists) return false;
 
     favorites.push(product);
     await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+
+    const uDoc = userDoc();
+    if (uDoc) {
+      const favRef = doc(collection(uDoc, "favourites"), String(product.id));
+      await setDoc(favRef, minimalProduct(product));
+    }
+
     return true;
   } catch (error) {
     console.error("Error adding favorite:", error);
@@ -40,16 +70,18 @@ export async function addFavorite(product) {
   }
 }
 
-/**
- * Remove a product from favorites
- * @param {string} productId - Product ID to remove
- * @returns {Promise<boolean>} Success status
- */
 export async function removeFavorite(productId) {
   try {
     const favorites = await getFavorites();
     const filtered = favorites.filter((fav) => fav.id !== productId);
     await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(filtered));
+
+    const uDoc = userDoc();
+    if (uDoc) {
+      const favRef = doc(collection(uDoc, "favourites"), String(productId));
+      await deleteDoc(favRef);
+    }
+
     return true;
   } catch (error) {
     console.error("Error removing favorite:", error);
@@ -57,11 +89,6 @@ export async function removeFavorite(productId) {
   }
 }
 
-/**
- * Check if a product is favorited
- * @param {string} productId - Product ID to check
- * @returns {Promise<boolean>} Whether product is favorited
- */
 export async function isFavorite(productId) {
   try {
     const favorites = await getFavorites();
@@ -72,16 +99,166 @@ export async function isFavorite(productId) {
   }
 }
 
-/**
- * Clear all favorites
- * @returns {Promise<boolean>} Success status
- */
 export async function clearFavorites() {
   try {
     await AsyncStorage.removeItem(FAVORITES_KEY);
+
+    const uDoc = userDoc();
+    if (uDoc) {
+      const favsCol = collection(uDoc, "favourites");
+      const snap = await getDocs(favsCol);
+      const batch = writeBatch(db);
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+
     return true;
   } catch (error) {
     console.error("Error clearing favorites:", error);
     return false;
+  }
+}
+
+// --------------- Profile ---------------
+
+export async function getProfile() {
+  try {
+    const stored = await AsyncStorage.getItem(PROFILE_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch (error) {
+    console.error("Error loading profile:", error);
+    return null;
+  }
+}
+
+export async function saveProfile(data) {
+  try {
+    await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(data));
+
+    const uDoc = userDoc();
+    if (uDoc) {
+      await setDoc(uDoc, { profile: data }, { merge: true });
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error saving profile:", error);
+    return false;
+  }
+}
+
+// --------------- Chat History ---------------
+
+export async function getChatHistory() {
+  try {
+    const stored = await AsyncStorage.getItem(CHAT_HISTORY_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch (error) {
+    console.error("Error loading chat history:", error);
+    return null;
+  }
+}
+
+export async function saveChatHistory(messages) {
+  try {
+    const toSave = messages.slice(-20);
+    await AsyncStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(toSave));
+
+    const uDoc = userDoc();
+    if (uDoc) {
+      await setDoc(uDoc, { chatHistory: { messages: toSave } }, { merge: true });
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error saving chat history:", error);
+    return false;
+  }
+}
+
+// --------------- Delete all user data ---------------
+
+export async function deleteAllUserData() {
+  const uDoc = userDoc();
+  if (!uDoc) return;
+
+  try {
+    // Delete favourites subcollection
+    const favsCol = collection(uDoc, "favourites");
+    const snap = await getDocs(favsCol);
+    const batch = writeBatch(db);
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+
+    // Delete the user document itself (profile, chatHistory)
+    await deleteDoc(uDoc);
+
+    // Clear local storage
+    await AsyncStorage.multiRemove([FAVORITES_KEY, PROFILE_KEY, CHAT_HISTORY_KEY]);
+  } catch (error) {
+    console.error("Error deleting user data:", error);
+  }
+}
+
+// --------------- Sync on login ---------------
+
+export async function syncOnLogin() {
+  const uDoc = userDoc();
+  if (!uDoc) return;
+
+  try {
+    // --- Favourites: merge local into Firestore, then pull combined set ---
+    const localFavs = await getFavorites();
+    const favsCol = collection(uDoc, "favourites");
+    const snap = await getDocs(favsCol);
+    const cloudFavs = snap.docs.map((d) => d.data());
+
+    // Merge: cloud wins on conflict (same id), local-only items get added
+    const merged = new Map();
+    cloudFavs.forEach((f) => merged.set(String(f.id), f));
+    localFavs.forEach((f) => {
+      const key = String(f.id);
+      if (!merged.has(key)) merged.set(key, f);
+    });
+
+    const allFavs = Array.from(merged.values());
+    await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(allFavs));
+
+    // Push any local-only favourites to Firestore
+    const cloudIds = new Set(cloudFavs.map((f) => String(f.id)));
+    const batch = writeBatch(db);
+    let writes = 0;
+    for (const fav of allFavs) {
+      if (!cloudIds.has(String(fav.id))) {
+        const favRef = doc(favsCol, String(fav.id));
+        batch.set(favRef, minimalProduct(fav));
+        writes++;
+      }
+    }
+    if (writes > 0) await batch.commit();
+
+    // --- Profile: cloud wins if exists, otherwise push local ---
+    const userSnap = await getDoc(uDoc);
+    const cloudProfile = userSnap.data()?.profile;
+    const localProfile = await getProfile();
+
+    if (cloudProfile) {
+      await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(cloudProfile));
+    } else if (localProfile) {
+      await setDoc(uDoc, { profile: localProfile }, { merge: true });
+    }
+
+    // --- Chat history: cloud wins if exists ---
+    const cloudChat = userSnap.data()?.chatHistory?.messages;
+    if (cloudChat?.length) {
+      await AsyncStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(cloudChat));
+    } else {
+      const localChat = await getChatHistory();
+      if (localChat?.length) {
+        await setDoc(uDoc, { chatHistory: { messages: localChat.slice(-20) } }, { merge: true });
+      }
+    }
+  } catch (error) {
+    console.error("Error syncing on login:", error);
   }
 }

@@ -21,8 +21,13 @@ You are a helpful, supportive, and safety-aware nutrition and dieting assistant.
 Your job is to:
 - Give evidence-based, practical advice on healthy eating, calorie goals, weight loss, and food choices.
 - Help users improve their diet in a safe, sustainable way.
-- Ask for missing information when needed (age, sex, height, weight, activity level, dietary restrictions).
 - Encourage gradual, realistic changes, not crash dieting.
+- Use the provided profile context as the primary source of user details when it exists.
+- Do NOT ask again for details already present in profile context.
+
+If profile context is partial:
+- Make reasonable, conservative assumptions.
+- Ask at most one brief clarifying question only when truly necessary for safety or accuracy.
 
 You are NOT a doctor.
 If the user mentions a medical condition (like diabetes, heart disease, pregnancy, kidney issues, eating disorders, etc.), you must:
@@ -31,13 +36,14 @@ If the user mentions a medical condition (like diabetes, heart disease, pregnanc
 - Avoid giving specific medical treatment or diagnosis.
 
 When a user asks about calorie targets:
-- Estimate a safe daily calorie range based on their weight, sex, and goal timeline.
+- Estimate a safe daily calorie range based on available profile info and goal timeline.
 - Prioritize healthy, balanced meals with protein, fiber, fruits, vegetables, and whole grains.
 - Avoid extreme or unsafe calorie deficits.
 
 When a user asks what to eat:
 - Recommend simple, affordable, and realistic meal ideas.
 - Focus on whole foods, lean proteins, vegetables, fruits, and healthy fats.
+- Respect diet preferences, allergens, and health conditions from profile context.
 - Suggest foods to reduce or limit (like sugary snacks, fried foods, refined carbs, and processed foods).
 
 Tone and style:
@@ -46,10 +52,98 @@ Tone and style:
 - Be encouraging and never judgmental.
 - Keep answers informative but concise.
 
-If the user gives too little information, ask a clarifying question instead of guessing.
-
 Always prioritize safety, sustainability, and healthy habits.
 """.strip()
+
+# Helper functions for sanitizing and processing profile context
+def _to_int_or_none(value, min_v, max_v):
+  # convert to int or return None if invalid
+  try:
+    if value is None or value == "":
+      return None
+    iv = int(value)
+    if iv < min_v or iv > max_v:
+      return None
+    return iv
+  except Exception:
+    return None
+
+# Keep only trimmed, non-empty strings from a list.
+def _clean_str_list(value, max_items=20):
+  if not isinstance(value, list):
+    return []
+  out = []
+  for x in value:
+    if isinstance(x, str):
+      s = x.strip()
+      if s:
+        out.append(s)
+    if len(out) >= max_items:
+      break
+  return out
+
+ # keeps only valid, relevant non-empty fields from the raw profile context, with some basic validation.
+def sanitize_profile_context(raw):
+  if not isinstance(raw, dict):
+    return {}
+
+  allowed_goals = {"lose", "maintain", "gain"}
+  allowed_activity = {"sedentary", "light", "moderate", "very"}
+  allowed_genders = {"male", "female", "other", "prefer_not"}
+
+  ctx = {}
+
+  goal = raw.get("goal")
+  if goal in allowed_goals:
+    ctx["goal"] = goal
+
+  activity = raw.get("activityLevel")
+  if activity in allowed_activity:
+    ctx["activityLevel"] = activity
+
+  gender = raw.get("gender")
+  if gender in allowed_genders:
+    ctx["gender"] = gender
+
+  age = _to_int_or_none(raw.get("age"), 1, 120)
+  height_cm = _to_int_or_none(raw.get("heightCm"), 80, 250)
+  weight_kg = _to_int_or_none(raw.get("weightKg"), 20, 350)
+  target = _to_int_or_none(raw.get("targetChangeKg6mo"), 0, 30)
+
+  if age is not None:
+    ctx["age"] = age
+  if height_cm is not None:
+    ctx["heightCm"] = height_cm
+  if weight_kg is not None:
+    ctx["weightKg"] = weight_kg
+  if target is not None:
+    ctx["targetChangeKg6mo"] = target
+
+  diet_prefs = _clean_str_list(raw.get("dietPrefs"))
+  allergens = _clean_str_list(raw.get("allergens"))
+  health_conditions = [x for x in _clean_str_list(raw.get("healthConditions")) if x != "N/A"]
+
+  if diet_prefs:
+    ctx["dietPrefs"] = diet_prefs
+  if allergens:
+    ctx["allergens"] = allergens
+  if health_conditions:
+    ctx["healthConditions"] = health_conditions
+
+  return ctx
+
+# Convert sanitized profile dict into a system instruction.
+# Empty profile -> no extra system message.
+def build_profile_system_prompt(ctx):
+  if not ctx:
+    return ""
+
+  lines = ["User profile constraints/preferences (follow these when relevant):"]
+  for k, v in ctx.items():
+    lines.append(f"- {k}: {v}")
+  lines.append("- If profile is partial, ask concise follow-up questions.")
+  return "\n".join(lines)
+
 
 class ChatView(APIView):
   permission_classes = []  # allow during dev
@@ -67,8 +161,12 @@ class ChatView(APIView):
 
     try:
       client = OpenAI(api_key=api_key)
+      profile_context = sanitize_profile_context(request.data.get("profileContext") or {})
 
       messages = [{"role": "system", "content": DIET_SYSTEM_PROMPT}]
+      profile_system = build_profile_system_prompt(profile_context)
+      if profile_system:
+        messages.append({"role": "system", "content": profile_system})
       for m in history:
         role = m.get("role")
         content = m.get("content")

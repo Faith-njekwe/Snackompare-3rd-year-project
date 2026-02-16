@@ -149,33 +149,6 @@ export async function saveProfile(data) {
 
 // Chat History 
 
-export async function getChatHistory() {
-  try {
-    const stored = await AsyncStorage.getItem(CHAT_HISTORY_KEY);
-    return stored ? JSON.parse(stored) : null;
-  } catch (error) {
-    console.error("Error loading chat history:", error);
-    return null;
-  }
-}
-
-export async function saveChatHistory(messages) {
-  try {
-    const toSave = messages.slice(-20);
-    await AsyncStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(toSave));
-
-    const uDoc = userDoc();
-    if (uDoc) {
-      await setDoc(uDoc, { chatHistory: { messages: toSave } }, { merge: true });
-    }
-
-    return true;
-  } catch (error) {
-    console.error("Error saving chat history:", error);
-    return false;
-  }
-}
-
 // Delete all user data 
 
 export async function deleteAllUserData() {
@@ -248,16 +221,6 @@ export async function syncOnLogin() {
       await setDoc(uDoc, { profile: localProfile }, { merge: true });
     }
 
-    // --- Chat history: cloud wins if exists ---
-    const cloudChat = userSnap.data()?.chatHistory?.messages;
-    if (cloudChat?.length) {
-      await AsyncStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(cloudChat));
-    } else {
-      const localChat = await getChatHistory();
-      if (localChat?.length) {
-        await setDoc(uDoc, { chatHistory: { messages: localChat.slice(-20) } }, { merge: true });
-      }
-    }
   } catch (error) {
     console.error("Error syncing on login:", error);
   }

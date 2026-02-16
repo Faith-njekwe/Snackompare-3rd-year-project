@@ -44,7 +44,7 @@ function TabNavigator() {
             iconName = focused ? "camera" : "camera-outline";
           } else if (route.name === "Profile") {
             iconName = focused ? "person" : "person-outline";
-          } else if (route.name === "Chatbot") {
+          } else if (route.name === "DietCoach") {
             iconName = focused ? "chatbubbles" : "chatbubbles-outline";
           }
 
@@ -83,9 +83,9 @@ function TabNavigator() {
         options={{ title: "Meal Tracker", headerShown: false }}
       />
       <Tab.Screen
-        name="Chatbot"
+        name="DietCoach"
         component={AIChatbotScreen}
-        options={{ title: "Chatbot" }}
+        options={{ title: "Diet Coach" }}
       />
     </Tab.Navigator>
   );
@@ -203,7 +203,6 @@ function AppContent() {
   const [onboardingComplete, setOnboardingComplete] = useState(false);
 
   useEffect(() => {
-    // This prevents state updates if the component unmounts mid-async call
     let cancelled = false;
 
     async function run() {

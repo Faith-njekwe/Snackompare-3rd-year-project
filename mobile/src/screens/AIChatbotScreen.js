@@ -10,28 +10,87 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
+import Markdown from "react-native-markdown-display";
 import { Ionicons } from "@expo/vector-icons";
 import { palette } from "../theme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { API_BASE_URL } from "../config";
-import { getChatHistory, saveChatHistory } from "../services/storage";
+import { getProfile } from "../services/storage";
+
 
 const welcomeMsg = {
   id: "welcome",
   role: "assistant",
-  text: "Hi! I'm your nutrition coach! 🥗\n\nTell me your goal, your height and weight, activity level, and any conditions (e.g., diabetes, celiac, allergies), and I'll help you build a plan.",
+  text: "Hi! I'm your nutrition coach! 🥗\n\nAsk me anything! I can build you a meal plan, or give you general advice.",
 };
+
+const ALLOWED_GOALS = new Set(["lose", "maintain", "gain"]);
+const ALLOWED_ACTIVITY = new Set(["sedentary", "light", "moderate", "very"]);
+const ALLOWED_GENDERS = new Set(["male", "female", "other", "prefer_not"]);
+
+function toIntOrNull(value, min, max) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  const i = Math.round(n);
+  if (i < min || i > max) return null;
+  return i;
+}
+
+function toCleanStringArray(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((x) => (typeof x === "string" ? x.trim() : ""))
+    .filter(Boolean)
+    .slice(0, 20);
+}
+
+function buildProfileContext(profile) {
+  if (!profile || typeof profile !== "object") return null;
+
+  const ctx = {};
+
+  // Goal + activity
+  if (ALLOWED_GOALS.has(profile.goal)) ctx.goal = profile.goal;
+  if (ALLOWED_ACTIVITY.has(profile.activityLevel)) ctx.activityLevel = profile.activityLevel;
+
+  // Gender if present
+  if (ALLOWED_GENDERS.has(profile.gender)) ctx.gender = profile.gender;
+
+  // Body metrics
+  const age = toIntOrNull(profile.age, 1, 120);
+  const heightCm = toIntOrNull(profile.heightCm, 80, 250);
+  const weightKg = toIntOrNull(profile.weightKg, 20, 350);
+  const targetChangeKg6mo = toIntOrNull(profile.targetChangeKg6mo, 0, 30);
+
+  if (age !== null) ctx.age = age;
+  if (heightCm !== null) ctx.heightCm = heightCm;
+  if (weightKg !== null) ctx.weightKg = weightKg;
+  if (targetChangeKg6mo !== null) ctx.targetChangeKg6mo = targetChangeKg6mo;
+
+  // Constraints/preferences
+  const dietPrefs = toCleanStringArray(profile.dietPrefs);
+  const allergens = toCleanStringArray(profile.allergens);
+  const healthConditions = toCleanStringArray(profile.healthConditions).filter((x) => x !== "N/A");
+
+  if (dietPrefs.length) ctx.dietPrefs = dietPrefs;
+  if (allergens.length) ctx.allergens = allergens;
+  if (healthConditions.length) ctx.healthConditions = healthConditions;
+
+  return Object.keys(ctx).length ? ctx : null;
+}
 
 export default function DietChatScreen() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([welcomeMsg]);
   const [isSending, setIsSending] = useState(false);
+  const [profile, setProfile] = useState(null);
   const scrollRef = useRef(null);
 
   useEffect(() => {
     (async () => {
-      const saved = await getChatHistory();
-      if (saved?.length) setMessages(saved);
+      const p = await getProfile();
+      setProfile(p); // can be sent to null
     })();
   }, []);
 
@@ -39,6 +98,7 @@ export default function DietChatScreen() {
   const API_URL = `${API_BASE_URL}/api/chat/`;
 
   const sendMessage = async () => {
+    const profileContext = buildProfileContext(profile);
     const trimmed = input.trim();
     if (!trimmed || isSending) return;
 
@@ -63,6 +123,7 @@ export default function DietChatScreen() {
         body: JSON.stringify({
           prompt: trimmed,
           history,
+          profileContext,
         }),
       });
 
@@ -78,12 +139,10 @@ export default function DietChatScreen() {
       }
 
       setMessages((prev) => {
-        const updated = [
+        return [
           ...prev,
           { id: String(Date.now() + 2), role: "assistant", text: data.aiResponse || "(no response)" },
         ];
-        saveChatHistory(updated);
-        return updated;
       });
     } catch (e) {
       setMessages((prev) => [
@@ -104,10 +163,6 @@ export default function DietChatScreen() {
 >
   <View style={styles.innerContainer}>
 
-    <View style={styles.header}>
-      <Text style={styles.title}>Diet Coach</Text>
-    </View>
-
     <ScrollView
       ref={scrollRef}
       style={styles.scrollView}
@@ -126,7 +181,7 @@ export default function DietChatScreen() {
             m.role === "assistant" ? styles.botMessage : styles.userMessage,
           ]}
         >
-          <Text style={styles.messageText}>{m.text}</Text>
+          <Markdown style={{ body: styles.messageText }}>{m.text}</Markdown>
         </View>
       ))}
     </ScrollView>
@@ -184,11 +239,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 4,
     marginBottom: 6,
-  },
-  title: {
-    color: palette.text,
-    fontSize: 28,
-    fontWeight: "700",
   },
   clearButton: {
     padding: 8,

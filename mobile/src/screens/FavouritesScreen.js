@@ -34,6 +34,8 @@ function FavouriteCard({ item, onDelete, onPress, getScoreColor }) {
     );
   };
 
+  const energy = item.nutriments?.energy ?? item.energy ?? null;
+
   return (
     <View style={styles.cardWrapper}>
       <TouchableOpacity
@@ -64,6 +66,9 @@ function FavouriteCard({ item, onDelete, onPress, getScoreColor }) {
             <View style={styles.categoryBadge}>
               <Text style={styles.productCategory}>{item.category}</Text>
             </View>
+          )}
+          {energy != null && (
+            <Text style={styles.energyText}>{Math.round(energy)} kcal/100g</Text>
           )}
         </View>
         <View style={styles.rightSection}>
@@ -165,7 +170,7 @@ export default function FavouritesScreen() {
             <Text style={styles.countText}>
               {favourites.length} {favourites.length === 1 ? "favourite" : "favourites"}
             </Text>
-            <Text style={styles.hintText}>Tap trash to remove</Text>
+            <Text style={styles.hintText}>Tap to view details</Text>
           </View>
         )}
 
@@ -346,6 +351,11 @@ const styles = StyleSheet.create({
   },
   heartIcon: {
     marginTop: 8,
+  },
+  energyText: {
+    fontSize: 11,
+    color: palette.muted,
+    marginTop: 4,
   },
   emptyContainer: {
     flex: 1,

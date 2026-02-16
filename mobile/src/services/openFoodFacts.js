@@ -24,9 +24,9 @@ const SEARCH_FIELDS = [
  * @param {number} pageSize - Number of results to return
  * @returns {Promise<Array>} Array of products
  */
-export async function searchProducts(query, pageSize = 10) {
+export async function searchProducts(query, pageSize = 10, page = 1) {
   if (!query || query.trim() === "") {
-    return [];
+    return { products: [], hasMore: false };
   }
 
   try {
@@ -35,6 +35,7 @@ export async function searchProducts(query, pageSize = 10) {
       search_simple: 1,
       json: 1,
       page_size: pageSize,
+      page: page,
       fields: SEARCH_FIELDS,
     });
 
@@ -45,10 +46,13 @@ export async function searchProducts(query, pageSize = 10) {
     }
 
     const data = await response.json();
-    return data.products || [];
+    const products = data.products || [];
+    const totalCount = data.count || 0;
+    const hasMore = page * pageSize < totalCount;
+    return { products, hasMore };
   } catch (error) {
     console.error("Error searching products:", error);
-    return [];
+    return { products: [], hasMore: false };
   }
 }
 
@@ -335,7 +339,7 @@ export async function findHealthierAlternatives(category, currentScore, excludeI
     }
 
     const data = await response.json();
-    const products = data.products || [];
+    const products = (data.products || []);
 
     // Format and filter for healthier options
     const alternatives = products

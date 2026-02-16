@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -6,13 +6,12 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
 } from "react-native";
 import * as Progress from "react-native-progress";
 import { Ionicons } from "@expo/vector-icons";
 import { palette } from "../theme";
 import { useCalorieTotal } from "../context/CalorieTotalContext";
+import { getCalorieLog, saveCalorieLog } from "../services/storage";
 
 function makeId() {
   return Math.random().toString(36).slice(2);
@@ -20,13 +19,58 @@ function makeId() {
 
 export default function CalorieTrackerScreen() {
   const [goalText, setGoalText] = useState("2000");
-  const { extraCalories } = useCalorieTotal();
+  const { extraCalories, pendingFoodItems, consumePendingItems } = useCalorieTotal();
 
   const [items, setItems] = useState([
     { id: makeId(), food: "", caloriesText: "" },
   ]);
 
-  
+  const [loaded, setLoaded] = useState(false);
+
+  // Load saved calorie log on mount
+  useEffect(() => {
+    getCalorieLog().then((saved) => {
+      if (saved) {
+        setGoalText(saved.goalText ?? "2000");
+        if (saved.items.length > 0) {
+          setItems(saved.items);
+        }
+      }
+      setLoaded(true);
+    });
+  }, []);
+
+  // Persist calorie log on changes (debounced)
+  useEffect(() => {
+    if (!loaded) return;
+    const timer = setTimeout(() => {
+      saveCalorieLog(goalText, items);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [goalText, items, loaded]);
+
+  const prevPendingLen = useRef(0);
+
+  useEffect(() => {
+    if (pendingFoodItems.length === 0 || pendingFoodItems.length === prevPendingLen.current) return;
+    prevPendingLen.current = pendingFoodItems.length;
+
+    const consumed = consumePendingItems();
+    if (consumed.length === 0) return;
+
+    const newRows = consumed.map((fi) => ({
+      id: makeId(),
+      food: fi.name,
+      caloriesText: String(fi.calories),
+    }));
+
+    setItems((prev) => {
+      const isDefaultEmpty =
+        prev.length === 1 && prev[0].food === "" && prev[0].caloriesText === "";
+      return isDefaultEmpty ? newRows : [...prev, ...newRows];
+    });
+  }, [pendingFoodItems, consumePendingItems]);
+
   //const totalCalories = useMemo(() => {
    // return items.reduce((sum, item) => {
      // const cals = Number(item.caloriesText);
@@ -41,7 +85,7 @@ export default function CalorieTrackerScreen() {
     }, 0);
   }, [items]);
 
-  const totalCalories = manualTotal + (Number(extraCalories) || 0);
+  const totalCalories = manualTotal;
 
 
   const goal = Number(goalText) || 0;
@@ -70,15 +114,13 @@ export default function CalorieTrackerScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
+    <ScrollView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      automaticallyAdjustKeyboardInsets
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
 
         {/* Progress Card */}
         <View style={styles.card}>
@@ -99,12 +141,6 @@ export default function CalorieTrackerScreen() {
           <View style={{ flex: 1, marginLeft: 16 }}>
             <Text style={styles.bigNumber}>{Math.round(totalCalories)} kcal</Text>
             <Text style={styles.muted}>Consumed today</Text>
-
-            {extraCalories > 0 && (
-              <Text style={[styles.muted, { marginTop: 4 }]}>
-                + Photo meals: {Math.round(extraCalories)} kcal
-              </Text>
-            )} 
 
             <View style={{ height: 10 }} />
 
@@ -185,8 +221,7 @@ export default function CalorieTrackerScreen() {
           </View>
         ))}
 
-        </ScrollView>
-    </KeyboardAvoidingView>
+    </ScrollView>
   );
 }
 

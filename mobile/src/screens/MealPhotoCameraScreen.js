@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { Camera, useCameraDevice } from "react-native-vision-camera";
 import { Ionicons } from "@expo/vector-icons";
-import { palette } from "../theme";
+import { palette, shadows } from "../theme";
 import { API_BASE_URL } from "../config";
 import { useCalorieTotal } from "../context/CalorieTotalContext";
 
@@ -74,11 +74,20 @@ export default function MealPhotoCameraScreen({ navigation }) {
         throw new Error(json?.error || "Server error");
       }
 
+      if (!json?.items || json.items.length === 0) {
+        Alert.alert(
+          "No Food Detected",
+          "We couldn't detect any food in your photo. Try taking a clearer picture with the food centered in the frame.",
+          [{ text: "Try Again" }]
+        );
+        return;
+      }
+
       setResult(json);
       setShowModal(true);
     } catch (e) {
       console.error("Capture/Upload Error:", e);
-      Alert.alert("Error", e.message || "Failed to analyze photo");
+      Alert.alert("Something went wrong", e.message || "Failed to analyze photo. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -154,7 +163,7 @@ export default function MealPhotoCameraScreen({ navigation }) {
 }
 
 function MealCaloriesModal({ visible, onClose, data }) {
-  const { addCalories } = useCalorieTotal();
+  const { addFoodItem } = useCalorieTotal();
   const items = data?.items || [];
   const [editableItems, setEditableItems] = useState([]);
 
@@ -218,72 +227,82 @@ function MealCaloriesModal({ visible, onClose, data }) {
           <Ionicons name="close" size={28} color={palette.text} />
         </TouchableOpacity>
 
-        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          <Text style={styles.modalTitle}>Calorie Estimation</Text>
-
-          {editableItems.length === 0 ? (
-            <Text style={{ color: palette.text, marginTop: 12 }}>
-              No results returned. Please try again.
+        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="always">
+          <View style={styles.modalHeader}>
+            <View style={styles.modalIconCircle}>
+              <Ionicons name="flame" size={24} color="#F59E0B" />
+            </View>
+            <Text style={styles.modalTitle}>Calorie Estimation</Text>
+            <Text style={styles.modalSubtitle}>
+              {editableItems.length} item{editableItems.length !== 1 ? "s" : ""} detected
             </Text>
-          ) : (
-            <>
-              {editableItems.map((item, idx) => {
-                const cal = itemCalories(item);
+          </View>
 
-                return (
-                  <View key={idx} style={styles.itemCard}>
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <View style={{ flex: 1, paddingRight: 12 }}>
-                        <Text style={styles.itemName}>{item.name}</Text>
+          {editableItems.map((item, idx) => {
+            const cal = itemCalories(item);
+            const confidence = Number(item.confidence || 0);
 
-                        <Text style={styles.itemDetail}>
-                          {Math.round(cal)} kcal • ~{item.gramsText || "0"}g
-                        </Text>
-
-                        <Text style={styles.itemConfidence}>
-                          Confidence: {(Number(item.confidence || 0) * 100).toFixed(0)}%
-                        </Text>
+            return (
+              <View key={idx} style={styles.itemCard}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View style={styles.itemIconCircle}>
+                    <Ionicons name="nutrition" size={18} color="#f97316" />
+                  </View>
+                  <View style={{ flex: 1, paddingRight: 12 }}>
+                    <Text style={styles.itemName}>{item.name}</Text>
+                    <View style={styles.itemMeta}>
+                      <View style={styles.calBadge}>
+                        <Text style={styles.calBadgeText}>{Math.round(cal)} kcal</Text>
                       </View>
-
-                      {/* Per-item editable grams box */}
-                      <View style={styles.gramsBox}>
-                        <TextInput
-                          value={item.gramsText}
-                          onChangeText={(t) => updateGrams(idx, t)}
-                          keyboardType="number-pad"
-                          returnKeyType="done"
-                          style={styles.gramsInput}
-                          placeholder="0"
-                          placeholderTextColor={palette.muted}
-                        />
-                        <Text style={styles.gramsUnit}>g</Text>
-                      </View>
+                      <Text style={styles.itemConfidence}>
+                        {(confidence * 100).toFixed(0)}% confidence
+                      </Text>
                     </View>
                   </View>
-                );
-              })}
 
-              <View style={styles.totalBox}>
-                <Text style={styles.totalCalories}>
-                  Total: {Math.round(totalCalories)} kcal
-                </Text>
-                <Text style={styles.totalConfidence}>
-                  Overall confidence: {(Number(data?.overall_confidence || 0) * 100).toFixed(0)}%
-                </Text>
+                  <View style={styles.gramsBox}>
+                    <TextInput
+                      value={item.gramsText}
+                      onChangeText={(t) => updateGrams(idx, t)}
+                      keyboardType="number-pad"
+                      returnKeyType="done"
+                      style={styles.gramsInput}
+                      placeholder="0"
+                      placeholderTextColor={palette.muted}
+                    />
+                    <Text style={styles.gramsUnit}>g</Text>
+                  </View>
+                </View>
               </View>
-              <TouchableOpacity
-                style={styles.addToCounterBtn}
-                onPress={() => {
-                  addCalories(totalCalories);
-                  onClose();
-                }}
-              >
-                <Text style={styles.addToCounterBtnText}>
-                  Add to Calorie Counter
-                </Text>
-              </TouchableOpacity>
-            </>   
-          )}
+            );
+          })}
+
+          <View style={styles.totalBox}>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Total Calories</Text>
+              <Text style={styles.totalCalories}>
+                {Math.round(totalCalories)} kcal
+              </Text>
+            </View>
+            <Text style={styles.totalConfidence}>
+              Overall confidence: {(Number(data?.overall_confidence || 0) * 100).toFixed(0)}%
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.addToCounterBtn}
+            onPress={() => {
+              editableItems.forEach((item) => {
+                addFoodItem(item.name, itemCalories(item));
+              });
+              onClose();
+            }}
+          >
+            <Ionicons name="add-circle" size={20} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={styles.addToCounterBtnText}>
+              Add to Calorie Counter
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
       </View>
     </View>
@@ -320,11 +339,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
     },
 
+    modalHeader: {
+    alignItems: "center",
+    marginBottom: 20,
+    paddingTop: 4,
+    },
+
+    modalIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#FEF3C7",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 10,
+    },
+
     modalTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "bold",
     color: palette.text,
-    marginBottom: 12,
+    marginBottom: 4,
+    },
+
+    modalSubtitle: {
+    fontSize: 14,
+    color: palette.muted,
     },
     captureContainer: {
     position: "absolute",
@@ -363,56 +403,85 @@ const styles = StyleSheet.create({
 
     itemCard: {
     backgroundColor: palette.card,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 14,
     borderWidth: 1,
     borderColor: palette.border,
-    marginBottom: 12,
+    marginBottom: 10,
+    ...shadows.card,
+    },
+
+    itemIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#FFF7ED",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
     },
 
     itemName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
     color: palette.text,
-    marginBottom: 4,
-    },
-
-    itemDetail: {
-    fontSize: 14,
-    color: palette.muted,
     marginBottom: 6,
     },
 
-    itemConfidence: {
-    fontSize: 13,
-    color: palette.text,
-    opacity: 0.85,
+    itemMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     },
 
-    assumptions: {
+    calBadge: {
+    backgroundColor: "#FEF3C7",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    },
+
+    calBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#D97706",
+    },
+
+    itemConfidence: {
     fontSize: 12,
     color: palette.muted,
-    marginTop: 8,
-    lineHeight: 18,
     },
 
     totalBox: {
     marginTop: 8,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: palette.border,
+    backgroundColor: palette.surface,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 4,
+    },
+
+    totalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+    },
+
+    totalLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: palette.text,
     },
 
     totalCalories: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "800",
     color: palette.text,
     },
 
     totalConfidence: {
-    fontSize: 14,
+    fontSize: 13,
     color: palette.muted,
-    marginTop: 4,
     },
 
     gramsBox: {
@@ -446,8 +515,9 @@ const styles = StyleSheet.create({
   marginTop: 14,
   marginBottom: 8,
   backgroundColor: palette.accent,
-  borderRadius: 12,
-  paddingVertical: 14,
+  borderRadius: 14,
+  paddingVertical: 16,
+  flexDirection: "row",
   alignItems: "center",
   justifyContent: "center",
 },

@@ -29,6 +29,9 @@ export default function SearchProductsScreen({ navigation }) {
   const [imageErrors, setImageErrors] = useState({});
   const [isFocused, setIsFocused] = useState(false);
   const [compareList, setCompareList] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const inputRef = useRef(null);
   const compareBarAnim = useRef(new Animated.Value(0)).current;
 
@@ -43,21 +46,46 @@ export default function SearchProductsScreen({ navigation }) {
       setIsLoading(true);
     }
     setHasSearched(true);
+    setCurrentPage(1);
 
     try {
-      const results = await searchProducts(trimmedQuery, 25);
+      const { products: results, hasMore: more } = await searchProducts(trimmedQuery, 10, 1);
       const formattedProducts = results
         .map(formatProductForApp)
         .filter((p) => p !== null);
       setProducts(formattedProducts);
+      setHasMore(more);
     } catch (error) {
       console.error("Search error:", error);
       setProducts([]);
+      setHasMore(false);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
   }, [searchQuery]);
+
+  const loadMore = useCallback(async () => {
+    const trimmedQuery = searchQuery.trim();
+    if (trimmedQuery.length < 2 || isLoadingMore || !hasMore) return;
+
+    setIsLoadingMore(true);
+    const nextPage = currentPage + 1;
+
+    try {
+      const { products: results, hasMore: more } = await searchProducts(trimmedQuery, 10, nextPage);
+      const formattedProducts = results
+        .map(formatProductForApp)
+        .filter((p) => p !== null);
+      setProducts((prev) => [...prev, ...formattedProducts]);
+      setCurrentPage(nextPage);
+      setHasMore(more);
+    } catch (error) {
+      console.error("Load more error:", error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [searchQuery, currentPage, isLoadingMore, hasMore]);
 
   const handleRefresh = useCallback(() => {
     if (hasSearched && searchQuery.trim().length >= 2) {
@@ -70,6 +98,8 @@ export default function SearchProductsScreen({ navigation }) {
     setSearchQuery("");
     setProducts([]);
     setHasSearched(false);
+    setCurrentPage(1);
+    setHasMore(false);
     // Don't clear compare list - user might want to keep their selections
     inputRef.current?.focus();
   };
@@ -269,6 +299,27 @@ export default function SearchProductsScreen({ navigation }) {
               </View>
             </TouchableOpacity>
           )}
+          ListFooterComponent={
+            hasMore && products.length > 0 ? (
+              <TouchableOpacity
+                style={styles.loadMoreButton}
+                onPress={loadMore}
+                disabled={isLoadingMore}
+                activeOpacity={0.7}
+              >
+                {isLoadingMore ? (
+                  <Animated.View>
+                    <Ionicons name="hourglass-outline" size={18} color="#FFFFFF" />
+                  </Animated.View>
+                ) : (
+                  <Ionicons name="chevron-down" size={18} color="#FFFFFF" />
+                )}
+                <Text style={styles.loadMoreText}>
+                  {isLoadingMore ? "Loading..." : "Load More"}
+                </Text>
+              </TouchableOpacity>
+            ) : null
+          }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconContainer}>
@@ -692,6 +743,22 @@ const styles = StyleSheet.create({
     backgroundColor: palette.muted,
   },
   compareButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  loadMoreButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: palette.accent,
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginTop: 4,
+    marginBottom: 16,
+    gap: 8,
+  },
+  loadMoreText: {
     color: "#FFFFFF",
     fontSize: 15,
     fontWeight: "600",

@@ -1,8 +1,15 @@
 import React, { useRef } from "react";
-import { View, Animated, TouchableOpacity, Text, StyleSheet } from "react-native";
+import {
+  View,
+  Animated,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  ScrollView,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { palette } from "../theme";
+import { palette, shadows } from "../theme";
 
 export default function TakeMealPhotoEntryScreen({ navigation }) {
   const scalePhoto = useRef(new Animated.Value(1)).current;
@@ -17,9 +24,25 @@ export default function TakeMealPhotoEntryScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.centerPage}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero / Header */}
+        <View style={styles.hero}>
+          <View style={styles.heroIconCircle}>
+            <Ionicons name="camera" size={48} color="#f97316" />
+          </View>
+          <Text style={styles.title}>Meal Tracker</Text>
+          <Text style={styles.subtitle}>
+            Snap a photo of your meal and get an instant AI-powered calorie
+            breakdown
+          </Text>
+        </View>
+
+        {/* CTA Card */}
         <Animated.View
-          style={[styles.optionCard, { transform: [{ scale: scalePhoto }] }]}
+          style={[styles.ctaCard, { transform: [{ scale: scalePhoto }] }]}
         >
           <TouchableOpacity
             activeOpacity={0.85}
@@ -27,160 +50,186 @@ export default function TakeMealPhotoEntryScreen({ navigation }) {
             onPressOut={() => animatePress(scalePhoto, 1)}
             onPress={() => navigation.navigate("MealPhotoCameraScreen")}
           >
-            <View style={[styles.gradientCard, styles.photoCard]}>
+            <View style={styles.ctaInner}>
               <View style={styles.decorOne} />
               <View style={styles.decorTwo} />
-              <View style={styles.iconContainer}>
-                <Ionicons name="camera" size={40} color="#ffffff" />
+              <View style={styles.ctaContent}>
+                <View style={styles.ctaLeft}>
+                  <View style={styles.ctaIconCircle}>
+                    <Ionicons name="camera" size={28} color="#ffffff" />
+                  </View>
+                  <View>
+                    <Text style={styles.ctaTitle}>Take a Photo</Text>
+                    <Text style={styles.ctaDescription}>
+                      Capture your meal for analysis
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={22} color="#ffffff" />
               </View>
-
-              <Text style={styles.optionTitle}>Take Picture</Text>
-              <Text style={styles.optionDescription}>
-                Take a picture to get a full AI-powered calorie estimation!
-              </Text>
             </View>
           </TouchableOpacity>
         </Animated.View>
-      </View>
+
+        {/* How It Works */}
+        <View style={styles.howItWorks}>
+          <Text style={styles.sectionTitle}>How it works</Text>
+          <View style={styles.stepsRow}>
+            <View style={styles.step}>
+              <View style={[styles.stepIcon, { backgroundColor: "#FFF7ED" }]}>
+                <Ionicons name="camera-outline" size={22} color="#f97316" />
+              </View>
+              <Text style={styles.stepLabel}>Take a photo</Text>
+            </View>
+            <View style={styles.step}>
+              <View style={[styles.stepIcon, { backgroundColor: "#EDE9FE" }]}>
+                <Ionicons name="sparkles" size={22} color="#8B5CF6" />
+              </View>
+              <Text style={styles.stepLabel}>AI analyzes{"\n"}your meal</Text>
+            </View>
+            <View style={styles.step}>
+              <View style={[styles.stepIcon, { backgroundColor: "#FEF3C7" }]}>
+                <Ionicons name="flame-outline" size={22} color="#F59E0B" />
+              </View>
+              <Text style={styles.stepLabel}>Get calorie{"\n"}estimate</Text>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: palette.bg,
+    backgroundColor: palette.surface,
   },
-  content: {
-    flex: 1,
+  scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 0,
-    alignItems: "center",
+    paddingTop: 16,
+    paddingBottom: 40,
   },
-  title: { fontSize: 32, fontWeight: "800", color: palette.text, marginBottom: 6, textAlign: "center" },
+  hero: {
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  heroIconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: "#FFF7ED",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: palette.text,
+    marginBottom: 8,
+  },
   subtitle: {
-    fontSize: 15,
+    fontSize: 14,
     color: palette.muted,
-    marginBottom: 18,
-    lineHeight: 22,
     textAlign: "center",
-    paddingHorizontal: 8,
+    lineHeight: 20,
+    paddingHorizontal: 16,
   },
-  sectionHeader: {
-    marginBottom: 10,
-    gap: 4,
+  ctaCard: {
+    borderRadius: 16,
+    overflow: "hidden",
+    marginBottom: 20,
+    ...shadows.card,
+  },
+  ctaInner: {
+    backgroundColor: "#f97316",
+    padding: 24,
+    paddingVertical: 28,
+    position: "relative",
+    overflow: "hidden",
+  },
+  ctaContent: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+  },
+  ctaLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    flex: 1,
+  },
+  ctaIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  ctaTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#ffffff",
+    marginBottom: 4,
+  },
+  ctaDescription: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.85)",
+  },
+  decorOne: {
+    position: "absolute",
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    top: -40,
+    right: -20,
+  },
+  decorTwo: {
+    position: "absolute",
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    bottom: -30,
+    left: -10,
+  },
+  howItWorks: {
+    backgroundColor: palette.card,
+    borderRadius: 16,
+    padding: 20,
+    ...shadows.card,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "700",
     color: palette.text,
+    marginBottom: 16,
     textAlign: "center",
   },
-  sectionSubtitle: {
-    fontSize: 13,
-    color: palette.muted,
-    lineHeight: 20,
-    textAlign: "center",
-    paddingHorizontal: 12,
-  },
-  optionsContainer: {
-    gap: 14,
-    marginBottom: 8,
-    width: "100%",
-  },
-  optionCard: {
-    borderRadius: 20,
-    overflow: "hidden",
-    elevation: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-  },
-  gradientCard: {
-    padding: 16,
-    minHeight: 135,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 10,
-    position: "relative",
-    textAlign: "center",
-  },
-  scanCard: { backgroundColor: "#4f8ef7", borderColor: "#4f8ef7", borderWidth: 1 },
-  searchCard: { backgroundColor: "#13b981", borderColor: "#059669", borderWidth: 1 },
-  iconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "rgba(0, 0, 0, 0.12)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  scanIconBg: { backgroundColor: "rgba(255,255,255,0.18)" },
-  searchIconBg: { backgroundColor: "rgba(255,255,255,0.18)" },
-  optionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: palette.text,
-    marginBottom: 4,
-    textAlign: "center",
-  },
-  optionDescription: {
-    fontSize: 13,
-    color: palette.text,
-    lineHeight: 18,
-    textAlign: "center",
-  },
-  decorOne: {
-    position: "absolute",
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    top: -50,
-    right: -20,
-  },
-  decorTwo: {
-    position: "absolute",
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: "rgba(0,0,0,0.06)",
-    bottom: -30,
-    left: -10,
-  },
-  statsContainer: {
+  stepsRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    backgroundColor: palette.card,
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: palette.border,
-    width: "100%",
+    justifyContent: "space-around",
   },
-  statBox: {
+  step: {
     alignItems: "center",
+    flex: 1,
   },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: palette.text,
-    marginTop: 8,
+  stepIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
   },
-  statLabel: {
+  stepLabel: {
     fontSize: 12,
+    fontWeight: "600",
     color: palette.muted,
-    marginTop: 4,
+    textAlign: "center",
+    lineHeight: 16,
   },
-  centerPage: {
-  flex: 1,
-  backgroundColor: palette.bg,
-  justifyContent: "center",
-  alignItems: "center",
-  paddingHorizontal: 16,
-  },
-  photoCard: { backgroundColor: "#f97316", borderColor: "#f97316", borderWidth: 1 },
 });
-

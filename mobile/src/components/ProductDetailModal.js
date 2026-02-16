@@ -9,19 +9,23 @@ import {
   Animated,
   Vibration,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { palette, shadows } from "../theme";
 import { addFavorite, isFavorite } from "../services/storage";
 import { findHealthierAlternatives } from "../services/openFoodFacts";
+import { useCalorieTotal } from "../context/CalorieTotalContext";
 
 export default function ProductDetailModal({ visible, product, onClose }) {
   const [isFavorited, setIsFavorited] = useState(false);
+  const [addedToCalories, setAddedToCalories] = useState(false);
   const [alternatives, setAlternatives] = useState([]);
   const [loadingAlternatives, setLoadingAlternatives] = useState(false);
   const [selectedAlternative, setSelectedAlternative] = useState(null);
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const { addFoodItem } = useCalorieTotal();
 
   useEffect(() => {
     if (visible) {
@@ -38,6 +42,7 @@ export default function ProductDetailModal({ visible, product, onClose }) {
   useEffect(() => {
     if (product) {
       checkFavoriteStatus();
+      setAddedToCalories(false);
       loadAlternatives();
     }
   }, [product]);
@@ -77,6 +82,15 @@ export default function ProductDetailModal({ visible, product, onClose }) {
       setIsFavorited(true);
       Vibration.vibrate(50);
     }
+  };
+
+  const handleAddToCalories = () => {
+    if (!product) return;
+    const energy = product.nutriments?.energy ?? 0;
+    const name = product.name || "Unknown";
+    addFoodItem(name, energy);
+    setAddedToCalories(true);
+    Vibration.vibrate(50);
   };
 
   const handleClose = () => {
@@ -270,6 +284,45 @@ export default function ProductDetailModal({ visible, product, onClose }) {
               </View>
             )}
 
+            <TouchableOpacity
+              style={[
+                styles.addButton,
+                isFavorited && styles.addButtonDisabled,
+              ]}
+              onPress={handleAddToFavorites}
+              disabled={isFavorited}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name={isFavorited ? "heart" : "heart-outline"}
+                size={22}
+                color="#FFFFFF"
+              />
+              <Text style={styles.addButtonText}>
+                {isFavorited ? "Added to Favourites" : "Add to Favourites"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.addButton,
+                styles.calorieButton,
+                addedToCalories && styles.addButtonDisabled,
+              ]}
+              onPress={handleAddToCalories}
+              disabled={addedToCalories}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name={addedToCalories ? "flame" : "flame-outline"}
+                size={22}
+                color="#FFFFFF"
+              />
+              <Text style={styles.addButtonText}>
+                {addedToCalories ? "Added to Calorie Tracker" : "Add to Calorie Tracker"}
+              </Text>
+            </TouchableOpacity>
+
             {/* Healthier Alternatives Section */}
             {product.score < 85 && (
               <View style={styles.alternativesSection}>
@@ -333,25 +386,6 @@ export default function ProductDetailModal({ visible, product, onClose }) {
                 )}
               </View>
             )}
-
-            <TouchableOpacity
-              style={[
-                styles.addButton,
-                isFavorited && styles.addButtonDisabled,
-              ]}
-              onPress={handleAddToFavorites}
-              disabled={isFavorited}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name={isFavorited ? "heart" : "heart-outline"}
-                size={22}
-                color="#FFFFFF"
-              />
-              <Text style={styles.addButtonText}>
-                {isFavorited ? "Added to Favourites" : "Add to Favourites"}
-              </Text>
-            </TouchableOpacity>
           </ScrollView>
         </Animated.View>
       </View>
@@ -673,6 +707,11 @@ const styles = StyleSheet.create({
   },
   addButtonDisabled: {
     backgroundColor: palette.muted,
+  },
+  calorieButton: {
+    backgroundColor: "#E8590C",
+    marginTop: 10,
+    marginBottom: 20,
   },
   addButtonText: {
     color: "#FFFFFF",

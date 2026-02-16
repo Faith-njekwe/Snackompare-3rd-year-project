@@ -13,6 +13,7 @@ import {
 const FAVORITES_KEY = "@snackompare_favorites";
 const PROFILE_KEY = "profilePrefs";
 const CHAT_HISTORY_KEY = "@snackompare_chat_history";
+const CALORIE_LOG_KEY = "@snackompare_calorie_log";
 
 // helpers 
 
@@ -33,6 +34,7 @@ function minimalProduct(product) {
     score: product.score ?? null,
     image: product.image ?? null,
     category: product.category ?? "",
+    energy: product.nutriments?.energy ?? product.energy ?? null,
   };
 }
 
@@ -147,9 +149,46 @@ export async function saveProfile(data) {
   }
 }
 
-// Chat History 
+// Chat History
 
-// Delete all user data 
+// Calorie Log
+
+export async function saveCalorieLog(goalText, items) {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const payload = { date: today, goalText, items };
+    await AsyncStorage.setItem(CALORIE_LOG_KEY, JSON.stringify(payload));
+
+    const uDoc = userDoc();
+    if (uDoc) {
+      const logRef = doc(collection(uDoc, "calorieLog"), "current");
+      await setDoc(logRef, payload);
+    }
+  } catch (error) {
+    console.error("Error saving calorie log:", error);
+  }
+}
+
+export async function getCalorieLog() {
+  try {
+    const json = await AsyncStorage.getItem(CALORIE_LOG_KEY);
+    if (!json) return null;
+
+    const data = JSON.parse(json);
+    const today = new Date().toISOString().slice(0, 10);
+
+    if (data.date === today) {
+      return { goalText: data.goalText, items: data.items };
+    }
+    // New day — keep goal, reset food log
+    return { goalText: data.goalText, items: [] };
+  } catch (error) {
+    console.error("Error loading calorie log:", error);
+    return null;
+  }
+}
+
+// Delete all user data
 
 export async function deleteAllUserData() {
   const uDoc = userDoc();
@@ -167,7 +206,7 @@ export async function deleteAllUserData() {
     await deleteDoc(uDoc);
 
     // Clear local storage
-    await AsyncStorage.multiRemove([FAVORITES_KEY, PROFILE_KEY, CHAT_HISTORY_KEY]);
+    await AsyncStorage.multiRemove([FAVORITES_KEY, PROFILE_KEY, CHAT_HISTORY_KEY, CALORIE_LOG_KEY]);
   } catch (error) {
     console.error("Error deleting user data:", error);
   }
@@ -219,6 +258,18 @@ export async function syncOnLogin() {
       await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(cloudProfile));
     } else if (localProfile) {
       await setDoc(uDoc, { profile: localProfile }, { merge: true });
+    }
+
+    // --- Calorie log: cloud wins if exists, otherwise push local ---
+    const logRef = doc(collection(uDoc, "calorieLog"), "current");
+    const logSnap = await getDoc(logRef);
+    if (logSnap.exists()) {
+      await AsyncStorage.setItem(CALORIE_LOG_KEY, JSON.stringify(logSnap.data()));
+    } else {
+      const localLog = await AsyncStorage.getItem(CALORIE_LOG_KEY);
+      if (localLog) {
+        await setDoc(logRef, JSON.parse(localLog));
+      }
     }
 
   } catch (error) {

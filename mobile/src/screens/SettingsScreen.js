@@ -8,6 +8,8 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Platform,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,30 +17,58 @@ import { palette } from "../theme";
 import { useAuth } from "../context/AuthContext";
 import { getProfile, saveProfile } from "../services/storage";
 
-const dietOptions = ["None", "Vegan", "Vegetarian", "Pescatarian", "Keto", "Low-carb"];
-const exerciseOptions = ["Sedentary", "Light", "Moderate", "Active", "Very Active"];
-const sugarOptions = ["Any", "Low", "Very Low"];
-const saltOptions = ["Any", "Low", "Very Low"];
-const proteinOptions = ["Standard", "High", "Very High"];
-const filterOptions = [
-  { key: "lowSugar", label: "Low sugar" },
-  { key: "lowSalt", label: "Low salt" },
-  { key: "highProtein", label: "High protein" },
+const GOAL_OPTIONS = [
+  { key: "lose", label: "Lose Weight" },
+  { key: "maintain", label: "Maintain Weight" },
+  { key: "gain", label: "Gain Weight" },
 ];
-const allergenOptions = ["Gluten", "Dairy", "Peanuts", "Tree nuts", "Soy", "Egg", "Shellfish"];
+
+const ACTIVITY_OPTIONS = [
+  { key: "sedentary", label: "Not Very Active" },
+  { key: "light", label: "Lightly Active" },
+  { key: "moderate", label: "Active" },
+  { key: "very", label: "Very Active" },
+];
+
+const DIET_OPTIONS = ["Vegetarian", "Vegan", "Halal", "Kosher", "Gluten-free", "Dairy-free"];
+const ALLERGEN_OPTIONS = ["Nuts", "Dairy", "Eggs", "Gluten", "Shellfish", "Soy"];
+const HEALTH_CONDITION_OPTIONS = [
+  "N/A",
+  "Diabetes",
+  "Coeliac disease",
+  "IBS",
+  "High cholesterol",
+  "High blood pressure",
+  "Kidney disease",
+  "GERD / Acid reflux",
+  "Gout",
+];
+
+function clampDigitsToRange(raw, min, max) {
+  const digitsOnly = (raw ?? "").replace(/\D/g, "");
+  if (!digitsOnly) return "";
+  const n = Number(digitsOnly);
+  if (Number.isNaN(n)) return "";
+  return String(Math.min(max, Math.max(min, n)));
+}
 
 export default function SettingsScreen() {
   const { user, loading: authLoading, signOut, deleteAccount } = useAuth();
 
   // Profile state
   const [name, setName] = useState("");
-  const [diet, setDiet] = useState("None");
-  const [exerciseLevel, setExerciseLevel] = useState("Sedentary");
-  const [sugarTolerance, setSugarTolerance] = useState("Any");
-  const [saltTolerance, setSaltTolerance] = useState("Any");
-  const [proteinTarget, setProteinTarget] = useState("Standard");
-  const [filters, setFilters] = useState({ lowSugar: false, lowSalt: false, highProtein: false });
+  const [age, setAge] = useState("");
+  const [heightCm, setHeightCm] = useState("");
+  const [weightKg, setWeightKg] = useState("");
+
+  const [goal, setGoal] = useState("maintain");
+  const [activityLevel, setActivityLevel] = useState("light");
+
+  const [dietPrefs, setDietPrefs] = useState([]);
   const [allergens, setAllergens] = useState([]);
+  const [healthConditions, setHealthConditions] = useState(["N/A"]);
+  const [targetChangeKg6mo, setTargetChangeKg6mo] = useState("");
+
   const [savedNote, setSavedNote] = useState("");
 
   useEffect(() => {
@@ -47,29 +77,58 @@ export default function SettingsScreen() {
 
   const loadProfile = async () => {
     const data = await getProfile();
-    if (data) {
-      setName(data.name || "");
-      setDiet(data.diet || "None");
-      setExerciseLevel(data.exerciseLevel || "Sedentary");
-      setSugarTolerance(data.sugarTolerance || "Any");
-      setSaltTolerance(data.saltTolerance || "Any");
-      setProteinTarget(data.proteinTarget || "Standard");
-      setFilters(data.filters || { lowSugar: false, lowSalt: false, highProtein: false });
-      setAllergens(data.allergens || []);
+    if (!data) return;
+
+    //fields for account info
+    setName(data.name || "");
+    setAge(data.age != null ? String(data.age) : "");
+    setHeightCm(data.heightCm != null ? String(data.heightCm) : "");
+    setWeightKg(data.weightKg != null ? String(data.weightKg) : "");
+    setGoal(data.goal || "maintain");
+    setActivityLevel(data.activityLevel || "light");
+    setTargetChangeKg6mo(
+      data.targetChangeKg6mo != null ? String(data.targetChangeKg6mo) : ""
+    );
+
+    // backward compatibility for old single-value diet
+    if (Array.isArray(data.dietPrefs)) {
+      setDietPrefs(data.dietPrefs);
+    } else if (typeof data.diet === "string" && data.diet !== "None") {
+      setDietPrefs([data.diet]);
+    } else {
+      setDietPrefs([]);
+    }
+
+    setAllergens(Array.isArray(data.allergens) ? data.allergens : []);
+
+    if (Array.isArray(data.healthConditions) && data.healthConditions.length) {
+      setHealthConditions(data.healthConditions);
+    } else {
+      setHealthConditions(["N/A"]);
     }
   };
 
   const handleSaveProfile = async () => {
+    const normalizedTargetChangeKg6mo =
+      goal === "maintain"
+        ? 0
+        : targetChangeKg6mo === ""
+        ? 0
+        : Number(targetChangeKg6mo);
+
     const payload = {
       name,
-      diet,
-      exerciseLevel,
-      sugarTolerance,
-      saltTolerance,
-      proteinTarget,
-      filters,
+      age: age === "" ? null : Number(age),
+      heightCm: heightCm === "" ? null : Number(heightCm),
+      weightKg: weightKg === "" ? null : Number(weightKg),
+      goal,
+      activityLevel,
+      targetChangeKg6mo: normalizedTargetChangeKg6mo,
+      dietPrefs,
       allergens,
+      healthConditions,
     };
+
     const ok = await saveProfile(payload);
     setSavedNote(ok ? "Preferences saved" : "Save failed");
     setTimeout(() => setSavedNote(""), 2000);
@@ -96,7 +155,6 @@ export default function SettingsScreen() {
             try {
               await deleteAccount();
             } catch (e) {
-              // Firebase requires recent login — ask for password to re-authenticate
               Alert.prompt(
                 "Confirm Password",
                 "Please enter your password to delete your account.",
@@ -124,14 +182,29 @@ export default function SettingsScreen() {
     );
   };
 
-  const toggleFilter = (key) => setFilters({ ...filters, [key]: !filters[key] });
-
-  const toggleAllergen = (item) => {
-    if (allergens.includes(item)) {
-      setAllergens(allergens.filter((a) => a !== item));
+  const toggleMultiSelect = (current, setter, value) => {
+    if (current.includes(value)) {
+      setter(current.filter((x) => x !== value));
     } else {
-      setAllergens([...allergens, item]);
+      setter([...current, value]);
     }
+  };
+
+  const toggleHealthCondition = (value) => {
+    setHealthConditions((prev) => {
+      const has = prev.includes(value);
+
+      if (value === "N/A") return ["N/A"];
+
+      const withoutNA = prev.filter((x) => x !== "N/A");
+
+      if (has) {
+        const next = withoutNA.filter((x) => x !== value);
+        return next.length ? next : ["N/A"];
+      }
+
+      return [...withoutNA, value];
+    });
   };
 
   if (authLoading) {
@@ -144,8 +217,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* ---- Account Section ---- */}
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
           <View style={{ gap: 12 }}>
@@ -164,7 +236,6 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* ---- Profile Section ---- */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Name</Text>
           <View style={styles.inputRow}>
@@ -174,95 +245,130 @@ export default function SettingsScreen() {
               onChangeText={setName}
               placeholder="Enter your name"
               placeholderTextColor={palette.muted}
+              returnKeyType="done"
+              onSubmitEditing={Keyboard.dismiss}
             />
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Dietary preference</Text>
-          <View style={styles.chipRow}>
-            {dietOptions.map((opt) => (
-              <TouchableOpacity
-                key={opt}
-                style={[styles.chip, diet === opt && styles.chipActive]}
-                onPress={() => setDiet(opt)}
-              >
-                <Text style={diet === opt ? styles.chipTextActive : styles.chipText}>{opt}</Text>
-              </TouchableOpacity>
-            ))}
+          <Text style={styles.sectionTitle}>Age</Text>
+          <View style={styles.inputRow}>
+            <TextInput
+              value={age}
+              onChangeText={(v) => setAge(clampDigitsToRange(v, 0, 120))}
+              keyboardType={Platform.OS === "ios" ? "number-pad" : "numeric"}
+              inputMode="numeric"
+              placeholder="Prefer not to say"
+              placeholderTextColor={palette.muted}
+              style={styles.input}
+              returnKeyType="done"
+              onSubmitEditing={Keyboard.dismiss}
+            />
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Exercise level</Text>
-          <View style={styles.chipRow}>
-            {exerciseOptions.map((opt) => (
-              <TouchableOpacity
-                key={opt}
-                style={[styles.chip, exerciseLevel === opt && styles.chipActive]}
-                onPress={() => setExerciseLevel(opt)}
-              >
-                <Text style={exerciseLevel === opt ? styles.chipTextActive : styles.chipText}>{opt}</Text>
-              </TouchableOpacity>
-            ))}
+          <Text style={styles.sectionTitle}>Height (cm)</Text>
+          <View style={styles.inputRow}>
+            <TextInput
+              value={heightCm}
+              onChangeText={(v) => setHeightCm(clampDigitsToRange(v, 0, 250))}
+              keyboardType={Platform.OS === "ios" ? "number-pad" : "numeric"}
+              inputMode="numeric"
+              placeholder="Prefer not to say"
+              placeholderTextColor={palette.muted}
+              style={styles.input}
+              returnKeyType="done"
+              onSubmitEditing={Keyboard.dismiss}
+            />
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sugar tolerance</Text>
-          <View style={styles.chipRow}>
-            {sugarOptions.map((opt) => (
-              <TouchableOpacity
-                key={opt}
-                style={[styles.chip, sugarTolerance === opt && styles.chipActive]}
-                onPress={() => setSugarTolerance(opt)}
-              >
-                <Text style={sugarTolerance === opt ? styles.chipTextActive : styles.chipText}>{opt}</Text>
-              </TouchableOpacity>
-            ))}
+          <Text style={styles.sectionTitle}>Weight (kg)</Text>
+          <View style={styles.inputRow}>
+            <TextInput
+              value={weightKg}
+              onChangeText={(v) => setWeightKg(clampDigitsToRange(v, 0, 300))}
+              keyboardType={Platform.OS === "ios" ? "number-pad" : "numeric"}
+              inputMode="numeric"
+              placeholder="Prefer not to say"
+              placeholderTextColor={palette.muted}
+              style={styles.input}
+              returnKeyType="done"
+              onSubmitEditing={Keyboard.dismiss}
+            />
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Salt tolerance</Text>
+          <Text style={styles.sectionTitle}>Goal</Text>
           <View style={styles.chipRow}>
-            {saltOptions.map((opt) => (
-              <TouchableOpacity
-                key={opt}
-                style={[styles.chip, saltTolerance === opt && styles.chipActive]}
-                onPress={() => setSaltTolerance(opt)}
-              >
-                <Text style={saltTolerance === opt ? styles.chipTextActive : styles.chipText}>{opt}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Protein target</Text>
-          <View style={styles.chipRow}>
-            {proteinOptions.map((opt) => (
-              <TouchableOpacity
-                key={opt}
-                style={[styles.chip, proteinTarget === opt && styles.chipActive]}
-                onPress={() => setProteinTarget(opt)}
-              >
-                <Text style={proteinTarget === opt ? styles.chipTextActive : styles.chipText}>{opt}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Health filters</Text>
-          <View style={styles.chipRow}>
-            {filterOptions.map((opt) => (
+            {GOAL_OPTIONS.map((opt) => (
               <TouchableOpacity
                 key={opt.key}
-                style={[styles.chip, filters[opt.key] && styles.chipActive]}
-                onPress={() => toggleFilter(opt.key)}
+                style={[styles.chip, goal === opt.key && styles.chipActive]}
+                onPress={() => {
+                  setGoal(opt.key);
+                  if (opt.key === "maintain") setTargetChangeKg6mo("0");
+                  if (opt.key === "lose" && !targetChangeKg6mo) setTargetChangeKg6mo("5");
+                  if (opt.key === "gain" && !targetChangeKg6mo) setTargetChangeKg6mo("3");
+                }}
               >
-                <Text style={filters[opt.key] ? styles.chipTextActive : styles.chipText}>{opt.label}</Text>
+                <Text style={goal === opt.key ? styles.chipTextActive : styles.chipText}>{opt.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>6-month target change (kg)</Text>
+          <View style={styles.inputRow}>
+            <TextInput
+              value={targetChangeKg6mo}
+              onChangeText={(v) => setTargetChangeKg6mo(clampDigitsToRange(v, 0, 25))}
+              keyboardType={Platform.OS === "ios" ? "number-pad" : "numeric"}
+              inputMode="numeric"
+              placeholder={goal === "maintain" ? "0" : "e.g. 5"}
+              placeholderTextColor={palette.muted}
+              style={styles.input}
+              returnKeyType="done"
+              onSubmitEditing={Keyboard.dismiss}
+            />
+          </View>
+          {goal === "maintain" ? (
+            <Text style={styles.helper}>Maintain goal sets this to 0kg.</Text>
+          ) : null}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Activity level</Text>
+          <View style={styles.chipRow}>
+            {ACTIVITY_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.chip, activityLevel === opt.key && styles.chipActive]}
+                onPress={() => setActivityLevel(opt.key)}
+              >
+                <Text style={activityLevel === opt.key ? styles.chipTextActive : styles.chipText}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Dietary preferences</Text>
+          <View style={styles.chipRow}>
+            {DIET_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt}
+                style={[styles.chip, dietPrefs.includes(opt) && styles.chipActive]}
+                onPress={() => toggleMultiSelect(dietPrefs, setDietPrefs, opt)}
+              >
+                <Text style={dietPrefs.includes(opt) ? styles.chipTextActive : styles.chipText}>{opt}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -271,13 +377,30 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Allergens</Text>
           <View style={styles.chipRow}>
-            {allergenOptions.map((opt) => (
+            {ALLERGEN_OPTIONS.map((opt) => (
               <TouchableOpacity
                 key={opt}
                 style={[styles.chip, allergens.includes(opt) && styles.chipActive]}
-                onPress={() => toggleAllergen(opt)}
+                onPress={() => toggleMultiSelect(allergens, setAllergens, opt)}
               >
                 <Text style={allergens.includes(opt) ? styles.chipTextActive : styles.chipText}>{opt}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Health conditions</Text>
+          <View style={styles.chipRow}>
+            {HEALTH_CONDITION_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt}
+                style={[styles.chip, healthConditions.includes(opt) && styles.chipActive]}
+                onPress={() => toggleHealthCondition(opt)}
+              >
+                <Text style={healthConditions.includes(opt) ? styles.chipTextActive : styles.chipText}>
+                  {opt}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -323,6 +446,12 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 10,
   },
+  helper: {
+  color: palette.muted,
+  marginTop: 8,
+  fontSize: 12.5,
+  lineHeight: 17,
+  },
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -359,21 +488,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
   },
-  authButtons: {
-    gap: 10,
-  },
-  primaryButton: {
-    backgroundColor: palette.accent,
-    borderRadius: 12,
-    padding: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  primaryButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
   outlineButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -392,11 +506,6 @@ const styles = StyleSheet.create({
   },
   dangerButton: {
     borderColor: palette.danger,
-  },
-  errorText: {
-    color: palette.danger,
-    fontSize: 13,
-    textAlign: "center",
   },
   saveButton: {
     flexDirection: "row",

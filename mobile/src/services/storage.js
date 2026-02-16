@@ -14,7 +14,7 @@ const FAVORITES_KEY = "@snackompare_favorites";
 const PROFILE_KEY = "profilePrefs";
 const CHAT_HISTORY_KEY = "@snackompare_chat_history";
 
-// --------------- helpers ---------------
+// helpers 
 
 function getUid() {
   return auth.currentUser?.uid ?? null;
@@ -36,7 +36,7 @@ function minimalProduct(product) {
   };
 }
 
-// --------------- Favourites ---------------
+//  Favourites
 
 export async function getFavorites() {
   try {
@@ -119,7 +119,7 @@ export async function clearFavorites() {
   }
 }
 
-// --------------- Profile ---------------
+//  Profile 
 
 export async function getProfile() {
   try {
@@ -147,7 +147,7 @@ export async function saveProfile(data) {
   }
 }
 
-// --------------- Chat History ---------------
+// Chat History 
 
 export async function getChatHistory() {
   try {
@@ -176,7 +176,7 @@ export async function saveChatHistory(messages) {
   }
 }
 
-// --------------- Delete all user data ---------------
+// Delete all user data 
 
 export async function deleteAllUserData() {
   const uDoc = userDoc();
@@ -200,7 +200,7 @@ export async function deleteAllUserData() {
   }
 }
 
-// --------------- Sync on login ---------------
+// Sync on login 
 
 export async function syncOnLogin() {
   const uDoc = userDoc();
@@ -260,5 +260,43 @@ export async function syncOnLogin() {
     }
   } catch (error) {
     console.error("Error syncing on login:", error);
+  }
+}
+
+
+// Onboarding 
+
+export async function getOnboardingCompleteFromCloud() {
+  const uDoc = userDoc();
+  if (!uDoc) return false;
+
+  try {
+    const snap = await getDoc(uDoc);
+
+    // If user doesn't exist yet, treat as NOT onboarded
+    if (!snap.exists()) {
+      // Optionally create it so it exists for later
+      await setDoc(uDoc, { onboardingComplete: false }, { merge: true });
+      return false;
+    }
+
+    return snap.data()?.onboardingComplete === true;
+  } catch (e) {
+    console.error("Error reading onboardingComplete:", e);
+    return false;
+  }
+}
+
+// Sets the current user's onboardingComplete flag in Firestore to true
+export async function setOnboardingCompleteInCloud(value = true) {
+  const uDoc = userDoc();
+  if (!uDoc) return false;
+
+  try {
+    await setDoc(uDoc, { onboardingComplete: value }, { merge: true });
+    return true;
+  } catch (e) {
+    console.error("Error saving onboardingComplete:", e);
+    return false;
   }
 }

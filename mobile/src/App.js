@@ -4,7 +4,11 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import { Platform, ActivityIndicator, View } from "react-native";
+import { useState, useEffect } from "react";
 
+import GoalScreen from "./onboard/GoalScreen";
+import DietScreen from "./onboard/DietScreen";
+import { getOnboardingCompleteFromCloud } from "./services/storage";
 import AuthScreen from "./screens/AuthScreen";
 import HomeScreen from "./screens/HomeScreen";
 import SearchProductsScreen from "./screens/SearchProductsScreen";
@@ -19,6 +23,7 @@ import ScanScreen from "./screens/ScanScreen";
 import { CalorieTotalProvider } from "./context/CalorieTotalContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { palette } from "./theme";
+import StatsActivityScreen from "./onboard/StatsActivityScreen";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -67,7 +72,6 @@ function TabNavigator() {
         component={HomeStack}
         options={{ title: "SnacKompare", headerShown: false }}
       />
-      {/* Removed Favourites from the navbar for now too*/}
       <Tab.Screen
         name="CalorieCounter"
         component={CalorieCountScreen}
@@ -179,10 +183,53 @@ function HomeStack() {
   );
 }
 
-function AppContent() {
-  const { user, loading } = useAuth();
+function OnboardingStack({ onComplete }) {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="OnboardingGoal" component={GoalScreen} />
+      <Stack.Screen name="OnboardingStatsActivity" component={StatsActivityScreen} />
+      <Stack.Screen name="OnboardingDiet">
+        {(props) => <DietScreen {...props} onComplete={onComplete} />}
+      </Stack.Screen>
+    </Stack.Navigator>
+  );
+}
 
-  if (loading) {
+
+function AppContent() {
+  // Check auth state and onboarding status
+  const { user, loading } = useAuth();
+  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
+
+  useEffect(() => {
+    // This prevents state updates if the component unmounts mid-async call
+    let cancelled = false;
+
+    async function run() {
+      if (!user) {
+        setOnboardingComplete(false);
+        setCheckingOnboarding(false);
+        return;
+      }
+
+       // We have a user, so check Firestore
+      setCheckingOnboarding(true);
+      const done = await getOnboardingCompleteFromCloud();
+      if (!cancelled) {
+        setOnboardingComplete(done);
+        setCheckingOnboarding(false);
+      }
+    }
+
+    if (!loading) run();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, loading]);
+
+  //loading spinning while we check auth and onboarding status
+  if (loading || checkingOnboarding) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: palette.bg }}>
         <ActivityIndicator size="large" color={palette.accent} />
@@ -190,22 +237,36 @@ function AppContent() {
     );
   }
 
-  if (!user) {
-    return <AuthScreen />;
-  }
-
+  //if onboarding is not complete, show the onboarding else show the main app
   return (
-    <NavigationContainer>
-      <TabNavigator />
-    </NavigationContainer>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {!user ? (
+        <Stack.Screen name="Auth" component={AuthScreen} />
+      ) : !onboardingComplete ? (
+        <Stack.Screen name="Onboarding">
+          {(props) => (
+            <OnboardingStack
+              {...props}
+              onComplete={() => setOnboardingComplete(true)}
+            />
+          )}
+        </Stack.Screen>
+      ) : (
+        <Stack.Screen name="Main" component={TabNavigator} />
+      )}
+    </Stack.Navigator>
   );
 }
+
+
 
 export default function App() {
   return (
     <AuthProvider>
       <CalorieTotalProvider>
-        <AppContent />
+        <NavigationContainer>
+          <AppContent />
+        </NavigationContainer>
       </CalorieTotalProvider>
     </AuthProvider>
   );

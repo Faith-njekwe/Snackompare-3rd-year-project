@@ -225,8 +225,7 @@ class ExplainView(APIView):
         )
       }
     )
-
-
+  
 class ProfileView(APIView):
   permission_classes = []
 
@@ -234,26 +233,56 @@ class ProfileView(APIView):
     user_id = request.query_params.get("user_id")
     if not user_id:
       return Response({"error": "user_id is required"}, status=status.HTTP_400_BAD_REQUEST)
-    try:
-      profile = UserProfile.objects.get(user_id=user_id)
+
+    profile = UserProfile.objects.filter(user_id=user_id).first()
+    if profile:
       return Response(UserProfileSerializer(profile).data)
-    except UserProfile.DoesNotExist:
-      return Response({"user_id": user_id, "name": "", "diet": "None", "filters": {}, "allergens": []})
+
+    return Response(
+      {
+        "user_id": user_id,
+        "name": "",
+        "gender": "prefer_not",
+        "goal": "maintain",
+        "activityLevel": "light",
+        "targetChangeKg6mo": 0,
+        "age": None,
+        "heightCm": None,
+        "weightKg": None,
+        "dietPrefs": [],
+        "allergens": [],
+        "healthConditions": ["N/A"],
+        "diet": "None",
+        "filters": {},
+      }
+    )
 
   def put(self, request):
     user_id = request.data.get("user_id")
     if not user_id:
       return Response({"error": "user_id is required"}, status=status.HTTP_400_BAD_REQUEST)
-    profile, _ = UserProfile.objects.update_or_create(
-      user_id=user_id,
-      defaults={
-        "name": request.data.get("name", ""),
-        "diet": request.data.get("diet", "None"),
-        "filters": request.data.get("filters", {}),
-        "allergens": request.data.get("allergens", []),
-      },
+
+    payload = request.data.copy()
+
+    # accept legacy `diet` input if client still sends it
+    if "dietPrefs" not in payload and "diet" in payload:
+      legacy_diet = payload.get("diet")
+      payload["dietPrefs"] = [] if legacy_diet in (None, "", "None") else [legacy_diet]
+
+    if "healthConditions" not in payload:
+      payload["healthConditions"] = ["N/A"]
+
+    payload["user_id"] = user_id
+
+    existing = UserProfile.objects.filter(user_id=user_id).first()
+    serializer = UserProfileSerializer(
+      existing,
+      data=payload,
+      partial=existing is not None,
     )
-    return Response(UserProfileSerializer(profile).data)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
 
 
 class RegisterView(APIView):

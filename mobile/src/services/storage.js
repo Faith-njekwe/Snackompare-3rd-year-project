@@ -158,12 +158,6 @@ export async function saveCalorieLog(goalText, items) {
     const today = new Date().toISOString().slice(0, 10);
     const payload = { date: today, goalText, items };
     await AsyncStorage.setItem(CALORIE_LOG_KEY, JSON.stringify(payload));
-
-    const uDoc = userDoc();
-    if (uDoc) {
-      const logRef = doc(collection(uDoc, "calorieLog"), "current");
-      await setDoc(logRef, payload);
-    }
   } catch (error) {
     console.error("Error saving calorie log:", error);
   }
@@ -191,6 +185,13 @@ export async function getCalorieLog() {
 // Delete all user data
 
 export async function deleteAllUserData() {
+  // Always clear local storage first so it runs even if Firestore fails
+  try {
+    await AsyncStorage.multiRemove([FAVORITES_KEY, PROFILE_KEY, CHAT_HISTORY_KEY, CALORIE_LOG_KEY]);
+  } catch (error) {
+    console.error("Error clearing local storage:", error);
+  }
+
   const uDoc = userDoc();
   if (!uDoc) return;
 
@@ -202,11 +203,15 @@ export async function deleteAllUserData() {
     snap.docs.forEach((d) => batch.delete(d.ref));
     await batch.commit();
 
+    // Delete calorieLog subcollection
+    const logCol = collection(uDoc, "calorieLog");
+    const logSnap = await getDocs(logCol);
+    const logBatch = writeBatch(db);
+    logSnap.docs.forEach((d) => logBatch.delete(d.ref));
+    await logBatch.commit();
+
     // Delete the user document itself (profile, chatHistory)
     await deleteDoc(uDoc);
-
-    // Clear local storage
-    await AsyncStorage.multiRemove([FAVORITES_KEY, PROFILE_KEY, CHAT_HISTORY_KEY, CALORIE_LOG_KEY]);
   } catch (error) {
     console.error("Error deleting user data:", error);
   }
@@ -258,18 +263,6 @@ export async function syncOnLogin() {
       await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(cloudProfile));
     } else if (localProfile) {
       await setDoc(uDoc, { profile: localProfile }, { merge: true });
-    }
-
-    // --- Calorie log: cloud wins if exists, otherwise push local ---
-    const logRef = doc(collection(uDoc, "calorieLog"), "current");
-    const logSnap = await getDoc(logRef);
-    if (logSnap.exists()) {
-      await AsyncStorage.setItem(CALORIE_LOG_KEY, JSON.stringify(logSnap.data()));
-    } else {
-      const localLog = await AsyncStorage.getItem(CALORIE_LOG_KEY);
-      if (localLog) {
-        await setDoc(logRef, JSON.parse(localLog));
-      }
     }
 
   } catch (error) {

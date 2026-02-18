@@ -1,0 +1,11 @@
+**Author:** Faith Njekwe
+
+# Deploying on Railway and making a calorie counter page
+
+## Deploying on Railway
+
+Last week I did two main things, firstly deploying the app on railway and secondly adding in a calorie tracker page so users can record how many calories they consume a day. I decided to deploy the app on railway because I had to change the API_URL used on the pages inside /mobile whenever my IP address changed, which was quite a hassle. I did some research into different cloud platforms to find the most suitable one for our app. I considered popular platforms like AWS, but they required a lot of configuration. I eventually decided to go with Railway it was easy to use, as the CLI was compatible with GitLab, unlike sites like Render that only support GitHub. All I had to do was log in to Railway and make a new project, create a Dockerfile and link the project with my repo. Railway has a free 1 month trial, the only issue is that it takes a while for the backend to wake up once it goes to sleep.
+
+## Calorie Counter Page
+
+After this, I focused on making a calorie counter page which users could use to log their daily calories. The page featured a daily goal, a circular progress indicator using `react-native-progress`, and dynamic input rows for logging foods and calories. I used useMemo to efficiently calculate totals and created a shared `CalorieTotalContext` so calories estimated from the `MealPhotoCameraScreen` could be passed into the calorie counter, allowing both manually entered foods and photo-detected meals to contribute to the user’s daily progress. I also added in some input validation, like ensuring images couldn't be more than 5MB on the backend and preventing empty and duplicate messages from the chatbot dieting coach.

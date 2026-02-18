@@ -60,9 +60,6 @@ export default function TakeMealPhotoEntryScreen({ navigation }) {
                   </View>
                   <View>
                     <Text style={styles.ctaTitle}>Take a Photo</Text>
-                    <Text style={styles.ctaDescription}>
-                      Capture your meal for analysis
-                    </Text>
                   </View>
                 </View>
                 <Ionicons name="chevron-forward" size={22} color="#ffffff" />
@@ -169,6 +166,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   ctaTitle: {
+    paddingTop: 6,
     fontSize: 20,
     fontWeight: "700",
     color: "#ffffff",

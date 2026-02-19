@@ -3,8 +3,6 @@
 
 ## 0. Table of Contents
 
-## 0. Table of Contents
-
 | Section | Title |
 |--------|-------|
 | 0 | Table of Contents |

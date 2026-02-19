@@ -66,14 +66,13 @@ Snackompare is an iOS mobile application developed using React Native, with a Dj
 
 Snackompare uses a multi-layer architecture with a React Native iOS frontend, a Django REST Framework (DRF) backend hosted on Railway, and Firebase for authentication and user data storage. The layers are separated so UI, API logic, and third-party services can be developed independently. 
 
-The frontend (React Native), located the mobile folder, handles user-facing features such as barcode scanning, product search, product comparison views, calorie tracking screens, and chatbot/meal-photo interfaces. In the current implementation, product lookup flows use openFoodFacts.js in the mobile app, so barcode/search/alternative product data is fetched directly from Open Food Facts at the client side for faster client-side responses. 
+The frontend (React Native), located in the mobile folder, handles user-facing features such as barcode scanning, product search, product comparison views, calorie tracking screens, and chatbot/meal-photo interfaces. In the current implementation, product lookup flows use openFoodFacts.js in the mobile app, so barcode/search/alternative product data is fetched directly from Open Food Facts at the client side for faster client-side responses. 
 
 The backend (DRF on Railway) is used primarily for server-side AI and app logic endpoints, including meal photo calorie estimation and chatbot responses. It also provides structured REST endpoints for other backend-managed features and acts as the centralized API layer for operations that should run securely on the server. 
 
 Open Food Facts (OFF) is the main external product/nutrition data source. It provides barcode-linked food metadata such as nutrition values, ingredients, allergens, and product identity fields used in the app’s search and scan experiences. 
 
-Firebase supports cross-cutting account and persistence services. Firebase Authentication manages sign-in/sign-up and identity, while Firebase database services store user-related data (for example their profile and preferences) needed for chatbot personalisation and continuity across sessions. 
-
+Firebase supports account and persistence services. Firebase Authentication manages sign-in/sign-up and identity, while Firebase database services store user-related data (for example their profile and preferences) needed for chatbot personalisation and continuity across sessions. 
 
 Communication is API-based: the mobile client calls DRF endpoints for AI features and backend-managed operations, while product search/scan data currently comes directly from Open Food Facts via the frontend integration. This reflects the demonstrated system as implemented. 
 

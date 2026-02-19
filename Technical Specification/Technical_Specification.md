@@ -3,7 +3,40 @@
 
 ## 0. Table of Contents
 
-- TBD
+## 0. Table of Contents
+
+| Section | Title |
+|--------|-------|
+| 0 | Table of Contents |
+| 1 | Introduction |
+| 1.1 | Overview |
+| 1.2 | Glossary |
+| 2 | System Architecture |
+| 3 | High-Level Design |
+| 3.1 | Authentication and User State |
+| 3.2 | Nutrition Processing and Health Scoring |
+| 3.3 | Comparison and Alternatives |
+| 3.4 | AI Services Layer |
+| 3.5 | Calorie Tracking and Personalisation |
+| 3.6 | Favourites and Saved Items |
+| 4 | Problems and Resolution |
+| 4.1 | Broken Pipe Error and Deploying on Railway |
+| 4.2 | Synchronisation Issues Between Devices (AsyncStorage → Firestore) |
+| 4.3 | Async State Persistence Between Accounts |
+| 4.4 | Slow Loading Times When Searching Open Food Facts |
+| 4.5 | User Testing Challenges |
+| 5 | Installation Guide |
+| 5.1 | Requirements |
+| 5.1.1 | Required Software |
+| 5.1.2 | Mobile Emulator Requirements |
+| 5.1.3 | Minimum Hardware Requirements |
+| 5.2 | Backend Server Setup |
+| 5.3 | External Services and Verification |
+| 5.4 | External Services and Verification |
+| 5.5 | Verification Steps |
+| 5.6 | Troubleshooting |
+| 5.7 | Testing |
+| 6 | References |
 
 ## 1. Introduction
 
@@ -128,7 +161,7 @@ Optionally, a physical phone running Android 10+ or iOS 14+ can be used for test
 ### 5.2 Backend Server Setup
 
 1. Clone the project repository
-```bash
+
 git clone https://github.com/fnjekwe/2026-csc1049-fnjekwe-snackompare.git
 cd 2026-csc1049-fnjekwe-snackompare
 
@@ -220,6 +253,24 @@ To verifiy the backend is working as intended cd into the backend and run either
 - python manage.py test 
 
 This either command will execute the backend test suite (currently 12 tests). 
+
+## References
+
+1. Openai (2026) OpenAI platform, OpenAI Platform. Available at: https://platform.openai.com/docs/overview (Accessed: 12 January 2026).
+
+2. React Native (2026) Introduction · React Native, React Native RSS. Available at: https://reactnative.dev/docs/getting-started (Accessed: 12 January 2026).
+
+3. Expo (2026) Expo Camera, Expo Documentation. Available at: https://docs.expo.dev/versions/latest/sdk/camera/ (Accessed: 12 January 2026).
+
+4. Christie, T. (2026) Django rest framework, Home - Django REST framework. Available at: https://www.django-rest-framework.org/ (Accessed: 12 January 2026).
+
+5. OpenFoodFacts (2026) Open Food Facts Documentation, Open Food Facts Wiki. Available at: https://wiki.openfoodfacts.org/Documentation#Documentation (Accessed: 12 January 2026).
+
+6. Railway (2026) Railway documentation, Railway. Available at: https://docs.railway.com/
+(Accessed: 6 February 2026).
+
+7. Google (2026) Firebase documentation, Firebase. Available at: https://firebase.google.com/docs
+(Accessed: 6 February 2026).
 
 
 

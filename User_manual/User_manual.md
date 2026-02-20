@@ -37,7 +37,7 @@ The app personalises chatbot responses based on your saved profile.
 6. If a user signs out, they can log in again with the same details.
 
 <div align="center">
-<img src="creatinganaccount.JPG" alt="Creating an Account" width="300"/>
+<img src="images/creatinganaccount.JPG" alt="Creating an Account" width="300"/>
 </div>
 
 ---
@@ -57,9 +57,9 @@ Enter your information and complete the onboarding questions to build your nutri
 
 Your onboarding profile is used across the app and can be updated later in **Settings**.
 
-<img src="onboarding1.JPG" alt="Onboarding Step 1" width="300"/>
-<img src="onboarding2.JPG" alt="Onboarding Step 2" width="300"/>
-<img src="onboarding3.JPG" alt="Onboarding Step 3" width="300"/>
+<img src="images/onboarding1.JPG" alt="Onboarding Step 1" width="300"/>
+<img src="images/onboarding2.JPG" alt="Onboarding Step 2" width="300"/>
+<img src="images/onboarding3.JPG" alt="Onboarding Step 3" width="300"/>
 
 </div>
 
@@ -83,7 +83,7 @@ You can add items to favourites from:
 - Barcode scanner results
 
 <div align="center">
-<img src="homepage.jpg" alt="Home Page" width="300"/>
+<img src="images/homepage.jpg" alt="Home Page" width="300"/>
 </div>
 
 ---
@@ -102,15 +102,15 @@ Once a user presses on the search button, they can search for any product that t
 - Healthier alternatives listed at the bottom with higher health scores (up to 3)
 
 <div align="center">
-<img src="search.JPG" alt="Search" width="300"/>
-<img src="healthyalternatives.jpg" alt="Healthy Alternatives" width="300"/>
+<img src="images/search.JPG" alt="Search" width="300"/>
+<img src="images/healthyalternatives.jpg" alt="Healthy Alternatives" width="300"/>
 </div>
 
 <div align="center">
 
 There's also a comparison feature which allows users to select 2 products and see a comprehensive AI comparison between them, and get a recommendation out of the two.
 
-<img src="compareproducts.JPG" alt="Compare Products" width="300"/>
+<img src="images/compareproducts.JPG" alt="Compare Products" width="300"/>
 
 </div>
 
@@ -129,7 +129,7 @@ Once a user presses on the barcode scanning button on the home page, they can ho
 - Possible allergens
 
 <div align="center">
-<img src="barcodescanner.JPG" alt="Barcode Scanner" width="300"/>
+<img src="images/barcodescanner.JPG" alt="Barcode Scanner" width="300"/>
 </div>
 
 ---
@@ -174,7 +174,7 @@ You can add food entries:
 
 Use this page to monitor daily totals and maintain a consistent log.
 
-<img src="caloriecounter.JPG" alt="Calorie Counter" width="300"/>
+<img src="images/caloriecounter.JPG" alt="Calorie Counter" width="300"/>
 
 </div>
 
@@ -192,7 +192,7 @@ Your profile can be edited at any time.
 
 Saved changes update personalisation throughout the app.
 
-<img src="profileandsettings.JPG" alt="Profile and Settings" width="300"/>
+<img src="images/profileandsettings.JPG" alt="Profile and Settings" width="300"/>
 
 </div>
 
@@ -223,5 +223,5 @@ The chatbot uses your saved profile to tailor responses. It takes into account:
 - Activity levels
 
 <div align="center">
-<img src="dietcoach.JPG" alt="Diet Coach" width="300"/>
+<img src="images/dietcoach.JPG" alt="Diet Coach" width="300"/>
 </div>

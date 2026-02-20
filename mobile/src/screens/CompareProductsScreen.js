@@ -65,34 +65,33 @@ export default function CompareProductsScreen({ route, navigation }) {
     return "Poor";
   };
 
-  // Find best and worst for each nutrient
-  const getNutrientComparison = (key, lowerIsBetter = true) => {
+  // Returns per-product status: 'best', 'worst', 'equal', or null (middle in 3-way)
+  const getNutrientStatuses = (key, lowerIsBetter = true) => {
     const values = products.map((p) => {
       const val = p.nutriments?.[key];
       return typeof val === "number" ? val : parseFloat(val) || 0;
     });
 
-    const validValues = values.filter((v) => v > 0);
-    if (validValues.length < 2) return { best: -1, worst: -1 };
+    const minVal = Math.min(...values);
+    const maxVal = Math.max(...values);
 
-    let bestIdx, worstIdx;
-    if (lowerIsBetter) {
-      bestIdx = values.indexOf(Math.min(...values));
-      worstIdx = values.indexOf(Math.max(...values));
-    } else {
-      bestIdx = values.indexOf(Math.max(...values));
-      worstIdx = values.indexOf(Math.min(...values));
-    }
+    // All values essentially equal
+    if (maxVal - minVal < 0.1) return values.map(() => "equal");
 
-    // Only mark if there's a meaningful difference
-    const diff = Math.abs(values[bestIdx] - values[worstIdx]);
-    if (diff < 0.1) return { best: -1, worst: -1 };
-
-    return { best: bestIdx, worst: worstIdx };
+    return values.map((v) => {
+      if (lowerIsBetter) {
+        if (Math.abs(v - minVal) < 0.1) return "best";
+        if (Math.abs(v - maxVal) < 0.1) return "worst";
+      } else {
+        if (Math.abs(v - maxVal) < 0.1) return "best";
+        if (Math.abs(v - minVal) < 0.1) return "worst";
+      }
+      return null; // middle value in a 3-way comparison
+    });
   };
 
   const renderNutrientRow = (label, key, unit, lowerIsBetter = true, icon, rowIndex) => {
-    const { best, worst } = getNutrientComparison(key, lowerIsBetter);
+    const statuses = getNutrientStatuses(key, lowerIsBetter);
 
     return (
       <Animated.View
@@ -119,8 +118,10 @@ export default function CompareProductsScreen({ route, navigation }) {
         <View style={styles.nutrientValues}>
           {products.map((product, index) => {
             const value = product.nutriments?.[key] || 0;
-            const isBest = index === best;
-            const isWorst = index === worst;
+            const status = statuses[index];
+            const isBest = status === "best";
+            const isWorst = status === "worst";
+            const isEqual = status === "equal";
 
             return (
               <View
@@ -129,6 +130,7 @@ export default function CompareProductsScreen({ route, navigation }) {
                   styles.nutrientValue,
                   isBest && styles.nutrientValueBest,
                   isWorst && styles.nutrientValueWorst,
+                  isEqual && styles.nutrientValueEqual,
                 ]}
               >
                 <Text
@@ -136,6 +138,7 @@ export default function CompareProductsScreen({ route, navigation }) {
                     styles.nutrientValueText,
                     isBest && styles.nutrientValueTextBest,
                     isWorst && styles.nutrientValueTextWorst,
+                    isEqual && styles.nutrientValueTextEqual,
                   ]}
                 >
                   {typeof value === "number" ? value.toFixed(1) : "0"}
@@ -145,6 +148,7 @@ export default function CompareProductsScreen({ route, navigation }) {
                     styles.nutrientUnit,
                     isBest && styles.nutrientValueTextBest,
                     isWorst && styles.nutrientValueTextWorst,
+                    isEqual && styles.nutrientValueTextEqual,
                   ]}
                 >
                   {unit}
@@ -157,6 +161,11 @@ export default function CompareProductsScreen({ route, navigation }) {
                 {isWorst && (
                   <View style={styles.worstBadge}>
                     <Ionicons name="close" size={10} color="#FFFFFF" />
+                  </View>
+                )}
+                {isEqual && (
+                  <View style={styles.equalBadge}>
+                    <Ionicons name="remove" size={10} color="#FFFFFF" />
                   </View>
                 )}
               </View>
@@ -186,8 +195,10 @@ export default function CompareProductsScreen({ route, navigation }) {
 
   const wins = products.map(() => 0);
   nutrientKeys.forEach(({ key, lower }) => {
-    const { best } = getNutrientComparison(key, lower);
-    if (best >= 0) wins[best]++;
+    const statuses = getNutrientStatuses(key, lower);
+    statuses.forEach((status, idx) => {
+      if (status === "best") wins[idx]++;
+    });
   });
 
   return (
@@ -260,11 +271,15 @@ export default function CompareProductsScreen({ route, navigation }) {
         <Animated.View style={[styles.legend, { opacity: fadeAnim }]}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: palette.success }]} />
-            <Text style={styles.legendText}>Better value</Text>
+            <Text style={styles.legendText}>Better</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: palette.danger }]} />
-            <Text style={styles.legendText}>Worse value</Text>
+            <Text style={styles.legendText}>Worse</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: palette.muted }]} />
+            <Text style={styles.legendText}>Equal</Text>
           </View>
         </Animated.View>
 
@@ -546,6 +561,25 @@ const styles = StyleSheet.create({
     backgroundColor: palette.danger,
     justifyContent: "center",
     alignItems: "center",
+  },
+  equalBadge: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: palette.muted,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  nutrientValueEqual: {
+    backgroundColor: "rgba(107, 114, 128, 0.1)",
+    borderWidth: 1,
+    borderColor: palette.muted,
+  },
+  nutrientValueTextEqual: {
+    color: palette.muted,
   },
   summarySection: {
     marginTop: 4,

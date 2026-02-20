@@ -5,39 +5,39 @@
 
 | Section | Title |
 |--------|-------|
-| 0 | Table of Contents |
-| 1 | Introduction |
-| 1.1 | Overview |
-| 1.2 | Glossary |
-| 2 | System Architecture |
-| 3 | High-Level Design |
-| 3.1 | Authentication and User State |
-| 3.2 | Nutrition Processing and Health Scoring |
-| 3.3 | Comparison and Alternatives |
-| 3.4 | AI Services Layer |
-| 3.5 | Calorie Tracking and Personalisation |
-| 3.6 | Favourites and Saved Items |
-| 4 | Problems and Resolution |
-| 4.1 | Broken Pipe Error and Deploying on Railway |
-| 4.2 | Synchronisation Issues Between Devices (AsyncStorage → Firestore) |
-| 4.3 | Async State Persistence Between Accounts |
-| 4.4 | Slow Loading Times When Searching Open Food Facts |
-| 4.5 | User Testing Challenges |
-| 5 | Installation Guide |
-| 5.1 | Requirements |
-| 5.1.1 | Required Software |
-| 5.1.2 | Mobile Emulator Requirements |
-| 5.1.3 | Minimum Hardware Requirements |
-| 5.2 | Backend Server Setup |
-| 5.3 | External Services and Verification |
-| 5.4 | External Services and Verification |
-| 5.5 | Verification Steps |
-| 5.6 | Troubleshooting |
-| 6 | Testing |
-| 6.1 |  Backend Testing|
-| 6.2 |  Frontend Testing|
-| 6.3 |  User Testing|
-| 7 | References |
+| 0 | [Table of Contents](#0-table-of-contents) |
+| 1 | [Introduction](#1-introduction) |
+| 1.1 | [Overview](#11-overview) |
+| 1.2 | [Glossary](#12-glossary) |
+| 2 | [System Architecture](#2-system-architecture) |
+| 3 | [High-Level Design](#3-high-level-design) |
+| 3.1 | [Authentication and User State](#authentication-and-user-state) |
+| 3.2 | [Nutrition Processing and Health Scoring](#nutrition-processing-and-health-scoring) |
+| 3.3 | [Comparison and Alternatives](#comparison-and-alternatives) |
+| 3.4 | [AI Services Layer](#ai-services-layer) |
+| 3.5 | [Calorie Tracking and Personalisation](#calorie-tracking-and-personalisation) |
+| 3.6 | [Favourites and Saved Items](#favourites-and-saved-items) |
+| 4 | [Problems and Resolution](#4-problems-and-resolution) |
+| 4.1 | [Broken Pipe Error and Deploying on Railway](#41-broken-pipe-error-and-deploying-on-railway) |
+| 4.2 | [Synchronisation Issues Between Devices](#42-synchronisation-issues-between-devices-asyncstorage--firestore) |
+| 4.3 | [Async State Persistence Between Accounts](#43-async-state-persistence-between-accounts) |
+| 4.4 | [Slow Loading Times When Searching Open Food Facts](#44-slow-loading-times-when-searching-open-food-facts) |
+| 4.5 | [User Testing Challenges](#45-user-testing-challenges) |
+| 5 | [Installation Guide](#5-installation-guide) |
+| 5.1 | [Requirements](#51-requirements) |
+| 5.1.1 | [Required Software](#required-software) |
+| 5.1.2 | [Mobile Emulator Requirements](#mobile-emulator-requirements) |
+| 5.1.3 | [Minimum Hardware Requirements](#minimum-hardware-requirements) |
+| 5.2 | [Backend Server Setup](#52-backend-server-setup) |
+| 5.3 | [External Services and Verification](#external-services-and-verification) |
+| 5.4 | [External Services and Verification](#54-external-services-and-verification) |
+| 5.5 | [Verification Steps](#verification-steps) |
+| 5.6 | [Troubleshooting](#troubleshooting) |
+| 6 | [Testing](#6-testing) |
+| 6.1 | [Backend Testing](#61-backend-testing) |
+| 6.2 | [Frontend Testing](#62-frontend-testing) |
+| 6.3 | [User Testing](#63-user-testing) |
+| 7 | [References](#7-references) |
 
 ---
 

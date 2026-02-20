@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,13 +8,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  ActivityIndicator,
+  ActivityIndicator
 } from "react-native";
 import Markdown from "react-native-markdown-display";
 import { Ionicons } from "@expo/vector-icons";
 import { palette } from "../theme";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { API_BASE_URL } from "../config";
+import { useFocusEffect } from "@react-navigation/native";
 import { getProfile } from "../services/storage";
 
 
@@ -87,20 +88,32 @@ export default function DietChatScreen() {
   const [profile, setProfile] = useState(null);
   const scrollRef = useRef(null);
 
-  useEffect(() => {
-    (async () => {
+  const loadLatestProfile = useCallback(async () => {
+    try {
       const p = await getProfile();
-      setProfile(p); // can be sent to null
-    })();
+      setProfile(p);
+      return p;
+    } catch (e) {
+      console.error("Failed to load profile:", e);
+      return null;
+    }
   }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadLatestProfile();
+    }, [loadLatestProfile])
+  );
+
 
 // used API_BASE_URL from config.js so as to not hardcode the URL here (hosted on railway)
   const API_URL = `${API_BASE_URL}/api/chat/`;
 
   const sendMessage = async () => {
-    const profileContext = buildProfileContext(profile);
     const trimmed = input.trim();
     if (!trimmed || isSending) return;
+
+    const latestProfile = await loadLatestProfile();
+    const profileContext = buildProfileContext(latestProfile);
 
     const userMsg = { id: String(Date.now()), role: "user", text: trimmed };
 
@@ -310,3 +323,5 @@ const styles = StyleSheet.create({
     backgroundColor: palette.accent,
   },
 });
+
+

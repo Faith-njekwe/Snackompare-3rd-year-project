@@ -108,7 +108,23 @@ Users can log daily food intake through the Calorie Counter tab. MealPhotoCamera
 Users can save products to a favourites list from any search or scan result. Favourites are persisted in AsyncStorage locally and mirrored to a Firestore subcollection (users/{uid}/favourites) for cross-device sync. A merge strategy on login ensures locally saved items are pushed to the cloud and cloud items are pulled down, with the cloud winning on conflict. 
 
 
-- Diagrams in the folder
+### 3.1 Data Flow Diagram
+
+This diagram shows the data movements within SnacKompare, illustrating the major processes, data stores, and external entities. It represents how the system handles scanning, searching, comparing products, generating meal plans, and storing user preferences.
+
+![Data Flow Diagram](DataFlowDiagram.png)
+
+### 3.2 Context Diagram
+
+This diagram shows how SnacKompare interacts with its external entities, including users, the OpenFoodFacts API, and the AI provider. It illustrates the flow of information between the system and these entities.
+
+![Context Diagram](ContextDiagram.png)
+
+### 3.3 Logical Data Structure
+
+This diagram presents the main data entities used in SnacKompare and the relationships between them. It represents how user accounts, scanned products, alternatives, and meal plans relate through cardinalities.
+
+![Logical Data Structure](LogicalDataStructure.png)
 
 ## 4. Problems and Resolution 
 

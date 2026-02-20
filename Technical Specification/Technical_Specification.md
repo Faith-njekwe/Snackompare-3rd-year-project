@@ -76,26 +76,6 @@ Snackompare is an iOS mobile application developed using React Native, with a Dj
 
 Snackompare uses a multi-layer architecture with a React Native iOS frontend, a Django REST Framework (DRF) backend hosted on Railway, and Firebase for authentication and user data storage. The layers are separated so UI, API logic, and third-party services can be developed independently. 
 
-+---------------------------------------------+
-|           React Native Mobile App            |  <- Frontend (iOS/Android)
-|         (Expo, React Navigation)             |
-+------------------+---------------------------+
-                   | HTTP / REST API
-+------------------v---------------------------+
-|         Django REST Framework Backend        |  <- API Server
-|              (Hosed on Railway cloud)                 |
-+----------+-------------------+--------------+
-           |                   |
-+----------v------+   +--------v------------+
-|  OpenFoodFacts  |   |  OpenAI API          |  <- External Services
-|  (Product Data) |   |  (GPT-4o-mini)       |
-+-----------------+   +---------------------+
-
-+---------------------------------------------+
-|              Firebase (Google)               |  <- Auth & Cloud Storage
-|   Authentication  |  Cloud Firestore         |
-+---------------------------------------------+
-
 The layers are deliberately separated so that the UI, API logic, and external services can be developed, tested, and deployed independently, a principle known as **separation of concerns** (Dijkstra, 1974).
 
 The frontend (React Native), located in the mobile folder, handles user-facing features such as barcode scanning, product search, product comparison views, calorie tracking screens, and chatbot/meal-photo interfaces. In the current implementation, product lookup flows use openFoodFacts.js in the mobile app, so barcode/search/alternative product data is fetched directly from Open Food Facts at the client side for faster client-side responses. 

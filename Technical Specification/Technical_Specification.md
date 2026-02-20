@@ -36,8 +36,11 @@
 | 6 | [Testing](#6-testing) |
 | 6.1 | [Backend Testing](#61-backend-testing) |
 | 6.2 | [Frontend Testing](#62-frontend-testing) |
-| 6.3 | [User Testing](#63-user-testing) |
-| 7 | [References](#7-references) |
+| 7 | [User Testing](#7-user-testing) |
+| 7.1 | [Findings](#71-our-findings) |
+| 7.2 | [What we changed](#72-what-we-changed) |
+| 7.3 | [Conclusion](#73-conclusion) |
+| 8 | [References](#8-references) |
 
 ---
 
@@ -72,6 +75,28 @@ Snackompare is an iOS mobile application developed using React Native, with a Dj
 ## 2. System Architecture
 
 Snackompare uses a multi-layer architecture with a React Native iOS frontend, a Django REST Framework (DRF) backend hosted on Railway, and Firebase for authentication and user data storage. The layers are separated so UI, API logic, and third-party services can be developed independently. 
+
++---------------------------------------------+
+|           React Native Mobile App            |  <- Frontend (iOS/Android)
+|         (Expo, React Navigation)             |
++------------------+---------------------------+
+                   | HTTP / REST API
++------------------v---------------------------+
+|         Django REST Framework Backend        |  <- API Server
+|              (Hosed on Railway cloud)                 |
++----------+-------------------+--------------+
+           |                   |
++----------v------+   +--------v------------+
+|  OpenFoodFacts  |   |  OpenAI API          |  <- External Services
+|  (Product Data) |   |  (GPT-4o-mini)       |
++-----------------+   +---------------------+
+
++---------------------------------------------+
+|              Firebase (Google)               |  <- Auth & Cloud Storage
+|   Authentication  |  Cloud Firestore         |
++---------------------------------------------+
+
+The layers are deliberately separated so that the UI, API logic, and external services can be developed, tested, and deployed independently, a principle known as **separation of concerns** (Dijkstra, 1974).
 
 The frontend (React Native), located in the mobile folder, handles user-facing features such as barcode scanning, product search, product comparison views, calorie tracking screens, and chatbot/meal-photo interfaces. In the current implementation, product lookup flows use openFoodFacts.js in the mobile app, so barcode/search/alternative product data is fetched directly from Open Food Facts at the client side for faster client-side responses. 
 
@@ -134,6 +159,8 @@ This diagram shows how SnacKompare interacts with its external entities, includi
 This diagram presents the main data entities used in SnacKompare and the relationships between them. It represents how user accounts, scanned products, alternatives, and meal plans relate through cardinalities.
 
 ![Logical Data Structure](LogicalDataStructure.png)
+
+**Note** - For more information on design please go to the design folder
 
 ---
 
@@ -272,7 +299,7 @@ The app will still function without OpenAI using fallback responses.
 
 ---
 
-## 6. Testing
+## 6. Application Testing
 
 To verifiy the backend is working as intended cd into the backend and run either 1, 2 or 3: 
 
@@ -362,9 +389,9 @@ End-to-end scoring sanity (healthy product scores higher than unhealthy product 
 - AI chat endpoint securely processes user prompts with profile context, sanitizes input to prevent prompt injection, and returns a valid AI-generated response.
 - AI meal scanner correctly validates image input, rejects large files, and returns clear errors when no food items can be recognised by the AI model.
 
-**Note** - For more information on tests please go to the testing folder
+**Note** - For more information on test please go the testing folder
 
-### 6.3 User Testing 
+### 7 User Testing 
 
 For user testing we developed a questionairre. We first reviewed our notes from the User Interface Design and Implementation module for guidance and noted down the most important points. We prioritised usability and UX goals, made sure each question measured something meaningful, and related the questions to real tasks the users would perform.
 
@@ -383,6 +410,10 @@ For user testing we developed a questionairre. We first reviewed our notes from 
 - Clarity
 
 Eventually we came up with 12 questions, organising them under relating headers. Once we were done we put them onto a Google Form.
+
+Link to the Google form: 
+
+https://docs.google.com/forms/d/1a36pW8bEbauJsrgwPZFwYJI4whpjwoNZqy3Mf1tZlEk/edit#responses
 
 ### General Context: 
 
@@ -412,6 +443,37 @@ Eventually we came up with 12 questions, organising them under relating headers.
 12. After using the app, how confident do you feel making food or health-related decisions? (scale)
 
 
+## 7.1 Our Findings
+
+Our user testing sessions taught us many things, and helped us make improvements. We found that:
+
+- The most well received features were calorie tracking and meal scanning. Most users said they would mainly use the app for calorie tracking and meal scanning, but comparisons were highly valued too.
+
+- Most users liked the UI, but some stated that they didn't like having to swipe to delete items on the favourites page
+
+- Some users said they would like to be able to edit or delete meal photo items from the calorie counter page
+
+- The loading speed for the search product feature was generally rated positively, 66.67% of users said it was fast and 33.33% of users said it was neutral.
+
+- Confidence in the meal scanner was moderately high overall, with most rating it 4/5. If results were inaccurate, users said they would would rescan, edit manually, or search manually instead.
+
+- Users found the chatbot useful, and 50% of users said it would be more useful if it had their profile information.
+
+## 7.2 What we changed?
+
+After user testing, we decided to implement some changes.
+
+- We removed the swipe to delete function and instead made it so that users can just click a trash can beside the item to delete
+
+- We made it so that when users add items from meal photos to the calorie counter, the items can be deleted and edited like manually added items.
+
+- Although the feedback on the loading speed wasn't negative, we concluded that it could be improved by changing how the search function loads items. Rather than loading all at once, made it so that the top 10 items loaded, and users could scroll down and press a button to load more. This significantly reduced the search feature's loading times.
+
+### 7.3 Conclusion
+
+User testing showed that users valued calorie tracking, meal scanning, and the chatbot, while also highlighting areas for improvement in usability and performance. Based on this feedback, we implemented changes to improve the meal scanner and significantly reduce loading times, resulting in a more efficient and user-friendly app.
+
+
 ## 7. References
 
 1. Openai (2026) OpenAI platform, OpenAI Platform. Available at: https://platform.openai.com/docs/overview (Accessed: 12 January 2026).
@@ -430,6 +492,7 @@ Eventually we came up with 12 questions, organising them under relating headers.
 7. Google (2026) Firebase documentation, Firebase. Available at: https://firebase.google.com/docs
 (Accessed: 6 February 2026).
 
+8. - Dijkstra, E.W. (1974) 'On the Role of Scientific Thought', in *Selected Writings on Computing: A Personal Perspective*. New York: Springer.
 
 
 

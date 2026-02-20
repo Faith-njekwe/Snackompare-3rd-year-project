@@ -364,20 +364,32 @@ AI meal scanner validates image input, rejects large files etc
 
 #### Unit tests:
 
+Testing single functions single functions, example:
+
 computeHealthScore: null safety, healthy vs unhealthy scoring behavior, score clamping (0–100), and category-specific rules (Beverages stricter sugar effect, FruitVeg bonus behavior).
+
 cleanProduct: raw OFF product normalization (field mapping), defaults (Unknown Product, Food), derived sodium (salt * 400), category derivation, allergen/additive mapping, and image preference.
+
 formatProductForApp: output shape for app use, id mapping from code, and score validity.
 
 #### Integration tests:
 
+Tests how our code interacts with external systems (like HTTP APIs), example:
+
 searchProducts: input guards (empty/whitespace query), successful API handling, pagination signal (hasMore), and failure fallbacks (non-OK response, network error).
+
 getProductByBarcode: input guard, success path, “not found” API status handling, and non-OK HTTP handling.
 
 #### System tests:
 
+Tests the full end-to-end workflow of the application as a whole, simulating real user scenario, example:
+
 Search result can be passed into app formatting (searchProducts -> formatProductForApp).
+
 Barcode lookup can be cleaned correctly (getProductByBarcode -> cleanProduct).
+
 Alternative-finding flow rules (findHealthierAlternatives early exit for high scores, API-failure fallback).
+
 End-to-end scoring sanity (healthy product scores higher than unhealthy product after full formatting pipeline).
 
 ### Overall, our frontend and backend test suites validate:

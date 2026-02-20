@@ -362,6 +362,8 @@ End-to-end scoring sanity (healthy product scores higher than unhealthy product 
 - AI chat endpoint securely processes user prompts with profile context, sanitizes input to prevent prompt injection, and returns a valid AI-generated response.
 - AI meal scanner correctly validates image input, rejects large files, and returns clear errors when no food items can be recognised by the AI model.
 
+**Note** - For more information on tests please go to the testing folder
+
 ### 6.3 User Testing 
 
 For user testing we developed a questionairre. We first reviewed our notes from the User Interface Design and Implementation module for guidance and noted down the most important points. We prioritised usability and UX goals, made sure each question measured something meaningful, and related the questions to real tasks the users would perform.

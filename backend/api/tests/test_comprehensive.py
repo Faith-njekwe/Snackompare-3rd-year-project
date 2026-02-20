@@ -17,9 +17,9 @@ from django.db import IntegrityError
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
-from api.models import Favorite, MealPlan, Product, UserProfile
+from api.models import Favorite, Product, UserProfile
 from api.services import health_delta
-from api.utils import clean_nutriments, clean_product, compute_health_score
+from api.utils import clean_nutriments, clean_product
 
 
 # ---------------------------------------------------------------------------
@@ -53,83 +53,6 @@ class ThrottleFreeMixin:
 # ===========================================================================
 # UNIT TESTS – Utility Functions (api/utils.py)
 # ===========================================================================
-
-class TestComputeHealthScore(TestCase):
-    """Unit tests for the compute_health_score utility."""
-
-    # 1
-    def test_empty_nutriments_returns_zero(self):
-        """None/empty nutriments short-circuits to 0."""
-        self.assertEqual(compute_health_score(None), 0)
-        self.assertEqual(compute_health_score({}), 0)
-
-    # 2
-    def test_zero_nutriments_returns_baseline_80(self):
-        """All-zero nutriments scores exactly 80 (the baseline)."""
-        n = {k: 0 for k in ["energy", "fat", "saturatedFat", "carbs", "sugar", "protein", "fiber", "salt"]}
-        self.assertEqual(compute_health_score(n), 80)
-
-    # 3
-    def test_protein_boosts_score(self):
-        """Higher protein raises the score above 80."""
-        low  = compute_health_score({"protein": 0,  "sugar": 0, "salt": 0})
-        high = compute_health_score({"protein": 30, "sugar": 0, "salt": 0})
-        self.assertGreater(high, low)
-
-    # 4
-    def test_fiber_boosts_score(self):
-        """Higher fiber raises the score above 80."""
-        low  = compute_health_score({"fiber": 0,  "sugar": 0, "salt": 0})
-        high = compute_health_score({"fiber": 15, "sugar": 0, "salt": 0})
-        self.assertGreater(high, low)
-
-    # 5
-    def test_sugar_above_default_limit_penalizes(self):
-        """Sugar above the default limit (25 g) lowers the score."""
-        normal = compute_health_score({"sugar": 10, "salt": 0})
-        sweet  = compute_health_score({"sugar": 60, "salt": 0})
-        self.assertLess(sweet, normal)
-
-    # 6
-    def test_salt_above_default_limit_penalizes(self):
-        """Salt above the default limit (1 g) lowers the score."""
-        normal = compute_health_score({"sugar": 0, "salt": 0.5})
-        salty  = compute_health_score({"sugar": 0, "salt": 5.0})
-        self.assertLess(salty, normal)
-
-    # 7
-    def test_saturated_fat_penalizes(self):
-        """Saturated fat reduces the score."""
-        lean  = compute_health_score({"saturatedFat": 0,  "sugar": 0, "salt": 0})
-        fatty = compute_health_score({"saturatedFat": 20, "sugar": 0, "salt": 0})
-        self.assertLess(fatty, lean)
-
-    # 8
-    def test_score_never_below_10(self):
-        """Score is clamped to a minimum of 10."""
-        worst = compute_health_score({"sugar": 200, "salt": 20, "saturatedFat": 50})
-        self.assertGreaterEqual(worst, 10)
-
-    # 9
-    def test_score_never_above_100(self):
-        """Score is clamped to a maximum of 100."""
-        best = compute_health_score({"protein": 100, "fiber": 100, "sugar": 0, "salt": 0})
-        self.assertLessEqual(best, 100)
-
-    # 10
-    def test_snack_category_has_higher_sugar_allowance(self):
-        """Snacks allow 30 g sugar before penalty vs 25 g default."""
-        score_default = compute_health_score({"sugar": 28, "salt": 0}, category=None)
-        score_snack   = compute_health_score({"sugar": 28, "salt": 0}, category="Snacks")
-        self.assertGreater(score_snack, score_default)
-
-    # 11
-    def test_low_sugar_diet_flag_amplifies_sugar_penalty(self):
-        """low_sugar flag multiplies total penalty by 1.1."""
-        score_normal   = compute_health_score({"sugar": 50, "salt": 0}, diet_flags={})
-        score_low_sugar = compute_health_score({"sugar": 50, "salt": 0}, diet_flags={"low_sugar": True})
-        self.assertLess(score_low_sugar, score_normal)
-
 
 class TestCleanNutriments(TestCase):
     """Unit tests for the clean_nutriments utility."""
@@ -299,17 +222,6 @@ class TestUserProfileModel(TestCase):
     def test_str_representation(self):
         p = UserProfile.objects.create(user_id="uid-str")
         self.assertIn("uid-str", str(p))
-
-
-class TestMealPlanModel(TestCase):
-    """Unit tests for the MealPlan model."""
-
-    # 26
-    def test_saves_and_retrieves_plan(self):
-        plan = {"structured": [{"day": "Mon", "breakfast": "Oats"}]}
-        mp = MealPlan.objects.create(user_id="uid-mp", profile={"goal": "lose"}, plan=plan)
-        fetched = MealPlan.objects.get(pk=mp.pk)
-        self.assertEqual(fetched.plan["structured"][0]["day"], "Mon")
 
 
 # ===========================================================================
@@ -703,46 +615,6 @@ class TestSystemExplainFallback(ThrottleFreeMixin, TestCase):
             resp = self.client.post("/api/explain/", payload, format="json")
         self.assertEqual(resp.status_code, 200)
         self.assertIn("explanation", resp.json())
-
-
-@THROTTLE_OVERRIDE
-class TestSystemMealPlan(ThrottleFreeMixin, TestCase):
-    """System tests: meal plan generation and persistence."""
-
-    def setUp(self):
-        super().setUp()
-        self.client = APIClient()
-
-    # 53
-    @patch("api.views.generate_meal_plan_llm")
-    def test_meal_plan_is_saved_to_database(self, mock_plan):
-        mock_plan.return_value = {"structured": [{"day": "Mon", "breakfast": "Oats"}]}
-        payload = {
-            "user_id": "sys-meal-user",
-            "profile": {"goal": "lose"},
-            "favourites": [{"name": "Greek Yogurt"}],
-        }
-        resp = self.client.post("/api/meal-plan/", payload, format="json")
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(MealPlan.objects.filter(user_id="sys-meal-user").exists())
-
-    # 54
-    @patch("api.views.generate_meal_plan_llm")
-    def test_meal_plan_contains_seven_days(self, mock_plan):
-        days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        mock_plan.return_value = {
-            "structured": [{"day": d, "breakfast": "Oats"} for d in days]
-        }
-        payload = {
-            "user_id": "sys-meal-user-2",
-            "profile": {"goal": "maintain"},
-            "favourites": [{"name": "Oats"}, {"name": "Banana"}],
-        }
-        resp = self.client.post("/api/meal-plan/", payload, format="json")
-        self.assertEqual(resp.status_code, 200)
-        plan = resp.json()["plan"]
-        self.assertIn("structured", plan)
-        self.assertEqual(len(plan["structured"]), 7)
 
 
 @THROTTLE_OVERRIDE

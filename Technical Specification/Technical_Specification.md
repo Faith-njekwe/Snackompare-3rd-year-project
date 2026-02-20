@@ -445,7 +445,7 @@ https://docs.google.com/forms/d/1a36pW8bEbauJsrgwPZFwYJI4whpjwoNZqy3Mf1tZlEk/edi
 12. After using the app, how confident do you feel making food or health-related decisions? (scale)
 
 
-## 7.1 Our Findings
+### 7.1 Our Findings
 
 Our user testing sessions taught us many things, and helped us make improvements. We found that:
 
@@ -461,7 +461,7 @@ Our user testing sessions taught us many things, and helped us make improvements
 
 - Users found the chatbot useful, and 50% of users said it would be more useful if it had their profile information.
 
-## 7.2 What we changed?
+### 7.2 What we changed?
 
 After user testing, we decided to implement some changes.
 

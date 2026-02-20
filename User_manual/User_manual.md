@@ -47,8 +47,26 @@ You can add items to favourites from:
 - Search results  
 - Barcode scanner results  
 
+## 5. Search and Comparison Feature
 
-## 5. Meal Tracker
+Once a user presses on the search button, they can search for any product that they want. At first 10 results appear at a time, and users can scroll down and press on the load more button to return more results. If a user presses on an item they see:
+
+- A product modal is with nutritional information
+- A health score is based on European Nutri-Score
+- Possible allergens
+- Healthier alternatives listed at the bottom with higher health scores (up to 3)
+
+There's also a comparison feature which allows users to select 2 products and see a comprehensive ai comparison between them, and get a recommendation out of the two.
+
+## 6. Barcode Scanning Feature
+
+Once a user presses on the barcode scanning button on the home page, can hold up a barcode in front of the scanner. If the barcode is recognised:
+
+- A product modal is returned with nutritional information
+- A health score is returned based on European Nutri-Score
+- Possible allergens
+
+## 7. Meal Tracker
 
 Use this feature to log meals from images.
 
@@ -61,7 +79,7 @@ Use this feature to log meals from images.
 Each item will appear individually on the calorie counter page, where you can choose to keep or delete entries.
 
 
-## 6. Calorie Counter
+## 8. Calorie Counter
 
 The Calorie Counter page tracks intake and supports multiple add methods.
 
@@ -74,18 +92,18 @@ You can add food entries:
 Use this page to monitor daily totals and maintain a consistent log.
 
 
-## 7. Profile and Settings
+## 9. Profile and Settings
 
 Your profile can be edited at any time.
 
-1. Open **Profile / Settings**.  
+1. Click on the profile button in the top right corner of the home screen. 
 2. Update your details (the same type of information set during onboarding).  
 3. Tap **Save** to apply changes.  
 
 Saved changes update personalisation throughout the app.
 
 
-## 8. Diet Coach
+## 10. Diet Coach
 
 The chatbot supports nutrition guidance and planning.
 

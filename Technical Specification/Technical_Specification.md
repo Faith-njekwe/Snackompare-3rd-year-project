@@ -33,8 +33,13 @@
 | 5.4 | External Services and Verification |
 | 5.5 | Verification Steps |
 | 5.6 | Troubleshooting |
-| 5.7 | Testing |
-| 6 | References |
+| 6 | Testing |
+| 6.1 |  Backend Testing|
+| 6.2 |  Frontend Testing|
+| 6.3 |  User Testing|
+| 7 | References |
+
+---
 
 ## 1. Introduction
 
@@ -62,6 +67,8 @@ Snackompare is an iOS mobile application developed using React Native, with a Dj
 | JSON (JavaScript Object Notation) | A lightweight data format used to exchange information between the mobile app and backend API. |
 | HTTP (Hypertext Transfer Protocol) | The protocol used for communication between the mobile application and backend server. |
 
+---
+
 ## 2. System Architecture
 
 Snackompare uses a multi-layer architecture with a React Native iOS frontend, a Django REST Framework (DRF) backend hosted on Railway, and Firebase for authentication and user data storage. The layers are separated so UI, API logic, and third-party services can be developed independently. 
@@ -75,6 +82,8 @@ Open Food Facts (OFF) is the main external product/nutrition data source. It pro
 Firebase supports account and persistence services. Firebase Authentication manages sign-in/sign-up and identity, while Firebase database services store user-related data (for example their profile and preferences) needed for chatbot personalisation and continuity across sessions. 
 
 Communication is API-based: the mobile client calls DRF endpoints for AI features and backend-managed operations, while product search/scan data currently comes directly from Open Food Facts via the frontend integration. This reflects the demonstrated system as implemented. 
+
+---
 
 ## 3. High-Level Design
 
@@ -126,6 +135,8 @@ This diagram presents the main data entities used in SnacKompare and the relatio
 
 ![Logical Data Structure](LogicalDataStructure.png)
 
+---
+
 ## 4. Problems and Resolution 
 
 #### 4.1 Broken Pipe Error and deploying on Railway
@@ -147,6 +158,8 @@ Search was initially slow because the app requested large responses (25 results 
 #### 4.5 User Testing Challenges 
 
 It took considerable time to complete the ethical approval process, as we needed to obtain our supervisor’s approval and prepare the survey and participant information sheet in advance. In addition, we reviewed user testing principles from the User Interface Design & Implementation module to design an effective and meaningful survey. Recruiting participants also proved challenging, as testing had to be conducted in person because the application could only be run on our own devices. 
+
+---
 
 ## 5. Installation Guide 
 
@@ -257,17 +270,149 @@ The app will still function without OpenAI using fallback responses.
 - If python is not found, try: python3 
 - If the app cannot connect to the backend, ensure the backend server terminal is still running 
 
-### Testing 
+---
 
-To verifiy the backend is working as intended cd into the backend and run either 1 or 2: 
+## 6. Testing
 
-- python manage.py test api.tests.test_api_endpoints 
+To verifiy the backend is working as intended cd into the backend and run either 1, 2 or 3: 
+
+- python manage.py test api.tests.test_comprehensive
+
+- python manage.py test api.tests.test_comprehensive -v 2 (to see them individually)
 
 - python manage.py test 
 
-This either command will execute the backend test suite (currently 12 tests). 
 
-## References
+This either command will execute the backend test suite (currently 47 tests). 
+
+To verify the frontend (in mobile folder) is working correctly cd into mobile and run:
+
+- npm test -- src/__tests__/openFoodFacts.test.js
+
+Now, I will explain the tests step by step
+
+### 6.1 Backend Testing
+
+Tests on the backend have also been structured into 3 layers.
+
+#### Unit tests
+These test small pieces in isolation (pure functions/services/models).
+
+No real API calls.
+Examples Include:
+
+model rules (Product, Favorite, UserProfile) like defaults, uniqueness, cascade delete.
+
+#### Integration tests
+
+These integration tests real Django REST endpoints with APIClient.
+
+Verify request/response + view logic together.
+
+External dependencies are mocked (e.g., fetch_search, fetch_barcode, OpenAI), so it’s still deterministic.
+
+Examples:
+
+/api/search/ filters + persistence (we have backup search + barcode views on the backend)
+/api/barcode/ response shape
+/api/favourites/ validation + per-user isolation
+/api/profile/ field mapping 
+auth validation errors
+explain endpoint required-field validation.
+
+#### System tests
+
+Multi-step end-to-end backend flows, and features like favourites, chat etc. (user journey across multiple requests).
+These test Validate state transitions over time.
+
+Examples:
+
+favourites add/list/delete
+
+chat profile-context sanitization before passing to model.
+
+AI meal scanner validates image input, rejects large files etc
+
+### 6.2 Frontend Testing 
+
+#### Unit tests (pure logic, no network):
+
+computeHealthScore: null safety, healthy vs unhealthy scoring behavior, score clamping (0–100), and category-specific rules (Beverages stricter sugar effect, FruitVeg bonus behavior).
+cleanProduct: raw OFF product normalization (field mapping), defaults (Unknown Product, Food), derived sodium (salt * 400), category derivation, allergen/additive mapping, and image preference.
+formatProductForApp: output shape for app use, id mapping from code, and score validity.
+
+#### Integration tests (service + mocked HTTP behavior):
+
+searchProducts: input guards (empty/whitespace query), successful API handling, pagination signal (hasMore), and failure fallbacks (non-OK response, network error).
+getProductByBarcode: input guard, success path, “not found” API status handling, and non-OK HTTP handling.
+
+#### System tests (multi-step workflows across functions):
+
+Search result can be passed into app formatting (searchProducts -> formatProductForApp).
+Barcode lookup can be cleaned correctly (getProductByBarcode -> cleanProduct).
+Alternative-finding flow rules (findHealthierAlternatives early exit for high scores, API-failure fallback).
+End-to-end scoring sanity (healthy product scores higher than unhealthy product after full formatting pipeline).
+
+### Overall, our frontend and backend test suites validate:
+
+- Correct transformation of Open Food Facts raw data into your app model.
+- Consistent health-scoring logic and category-specific behavior.
+- Robust error handling and safe defaults when API/input is bad.
+- Basic cross-function compatibility for real user flows (search, scan, compare).
+- AI chat endpoint securely processes user prompts with profile context, sanitizes input to prevent prompt injection, and returns a valid AI-generated response.
+- AI meal scanner correctly validates image input, rejects large files, and returns clear errors when no food items can be recognised by the AI model.
+
+**Note** - For more information on tests please go to the testing folder
+
+### 6.3 User Testing 
+
+For user testing we developed a questionairre. We first reviewed our notes from the User Interface Design and Implementation module for guidance and noted down the most important points. We prioritised usability and UX goals, made sure each question measured something meaningful, and related the questions to real tasks the users would perform.
+
+**Our primary usability goals were:**
+
+- Efficiency – users should be able to quickly search, scan, and compare food
+- Error rate – AI estimates and meal scans must feel reliable
+- Learnability – first-time users should understand features with minimal instruction
+- Satisfaction – users feel the app is helpful and worth returning to
+
+**Our UX goals were:**
+
+- Trust and confidence
+- Motivation
+- Enjoyment
+- Clarity
+
+Eventually we came up with 12 questions, organising them under relating headers. Once we were done we put them onto a Google Form.
+
+### General Context: 
+
+1. What would you mainly use this app for? (multiple choice)
+2. What’s one feature that would make you want to use this app daily?
+
+### Learnability and clarity:
+
+3. Was anything confusing or unclear on any screen? If so, what?
+3. Do you think the search results and health scores are informative enough? Why or why not?
+
+### Core task performance (Efficiency and error rate)
+
+5. How do you feel about the loading times for search, barcode scanning, meal scanning, and the chatbot? (scale)
+6. If the meal scan result looked inaccurate, what would you do next?
+
+### AI features and trust
+
+7. How confident do you feel about the calorie estimates from the meal scanner? (scale)
+8. Would you trust the chatbot’s dietary advice? Why or why not?
+9. Do you find the chatbot useful? Would it be more useful if it knew your dietary preferences or favourite foods?
+
+### Reflection and Improvement
+
+10. Do you think the UI could be improved? If so, how?
+11. What additional features would you expect or like to see in this type of app?
+12. After using the app, how confident do you feel making food or health-related decisions? (scale)
+
+
+## 7. References
 
 1. Openai (2026) OpenAI platform, OpenAI Platform. Available at: https://platform.openai.com/docs/overview (Accessed: 12 January 2026).
 

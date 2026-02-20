@@ -326,13 +326,12 @@ Multi-step end-to-end backend flows, and features like favourites, chat etc. (us
 These test Validate state transitions over time.
 
 Examples:
-register then login token consistency
-
-profile create/update/retrieve lifecycle
 
 favourites add/list/delete
 
 chat profile-context sanitization before passing to model.
+
+AI meal scanner validates image input, rejects large files etc
 
 ### 6.2 Frontend Testing 
 
@@ -354,7 +353,7 @@ Barcode lookup can be cleaned correctly (getProductByBarcode -> cleanProduct).
 Alternative-finding flow rules (findHealthierAlternatives early exit for high scores, API-failure fallback).
 End-to-end scoring sanity (healthy product scores higher than unhealthy product after full formatting pipeline).
 
-**Overall, our test suites validates:**
+### Overall, our frontend and backend test suites validate:
 
 - Correct transformation of Open Food Facts raw data into your app model.
 - Consistent health-scoring logic and category-specific behavior.

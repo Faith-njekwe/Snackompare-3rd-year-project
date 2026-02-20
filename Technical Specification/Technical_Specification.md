@@ -481,7 +481,7 @@ After user testing, we decided to implement some changes.
 
 - We made it so that when users add items from meal photos to the calorie counter, the items can be deleted and edited like manually added items.
 
-- Although the feedback on the loading speed wasn't negative, we concluded that it could be improved by changing how the search function loads items. Rather than loading all at once, made it so that the top 10 items loaded, and users could scroll down and press a button to load more. This significantly reduced the search feature's loading times.
+- Although the feedback on the loading speed wasn't negative, we concluded that it could be improved by changing how the search function loads items. Rather than loading all the items at once, we made it so that the top 10 items loaded, and users could scroll down and press a button to load more. This significantly reduced the search feature's loading times.
 
 ### 7.3 Conclusion
 

@@ -23,7 +23,7 @@ The app personalises chatbot responses based on your saved profile.
 5. After successful sign-up, continue to the onboarding screens.
 6. If a user signs out, they can log in again with the same details.
 
-![Creating an Account](creatinganaccount.JPG)
+<img src="creatinganaccount.JPG" alt="Creating an Account" width="300"/>
 
 
 ## 3. Onboarding (Initial Profile Setup)
@@ -35,11 +35,11 @@ Enter your information and complete the onboarding questions to build your nutri
 
 Your onboarding profile is used across the app and can be updated later in **Settings**.
 
-![Onboarding Step 1](onboarding1.JPG)
+<img src="onboarding1.JPG" alt="Onboarding Step 1" width="300"/>
 
-![Onboarding Step 2](onboarding2.JPG)
+<img src="onboarding2.JPG" alt="Onboarding Step 2" width="300"/>
 
-![Onboarding Step 3](onboarding3.JPG)
+<img src="onboarding3.JPG" alt="Onboarding Step 3" width="300"/>
 
 
 ## 4. Home Page
@@ -55,7 +55,7 @@ You can add items to favourites from:
 - Search results
 - Barcode scanner results
 
-![Home Page](homepage.jpg)
+<img src="homepage.jpg" alt="Home Page" width="300"/>
 
 
 ## 5. Search and Comparison Feature
@@ -67,13 +67,13 @@ Once a user presses on the search button, they can search for any product that t
 - Possible allergens
 - Healthier alternatives listed at the bottom with higher health scores (up to 3)
 
-![Search](search.JPG)
+<img src="search.JPG" alt="Search" width="300"/>
 
-![Healthy Alternatives](healthyalternatives.jpg)
+<img src="healthyalternatives.jpg" alt="Healthy Alternatives" width="300"/>
 
 There's also a comparison feature which allows users to select 2 products and see a comprehensive ai comparison between them, and get a recommendation out of the two.
 
-![Compare Products](compareproducts.JPG)
+<img src="compareproducts.JPG" alt="Compare Products" width="300"/>
 
 
 ## 6. Barcode Scanning Feature
@@ -84,7 +84,7 @@ Once a user presses on the barcode scanning button on the home page, can hold up
 - A health score is returned based on European Nutri-Score
 - Possible allergens
 
-![Barcode Scanner](barcodescanner.JPG)
+<img src="barcodescanner.JPG" alt="Barcode Scanner" width="300"/>
 
 
 ## 7. Meal Tracker
@@ -112,7 +112,7 @@ You can add food entries:
 
 Use this page to monitor daily totals and maintain a consistent log.
 
-![Calorie Counter](caloriecounter.JPG)
+<img src="caloriecounter.JPG" alt="Calorie Counter" width="300"/>
 
 
 ## 9. Profile and Settings
@@ -125,7 +125,7 @@ Your profile can be edited at any time.
 
 Saved changes update personalisation throughout the app.
 
-![Profile and Settings](profileandsettings.JPG)
+<img src="profileandsettings.JPG" alt="Profile and Settings" width="300"/>
 
 
 ## 10. Diet Coach
@@ -148,4 +148,4 @@ The chatbot uses your saved profile to tailor responses. It takes into account:
 - Dietary preferences
 - Activity levels
 
-![Diet Coach](dietcoach.JPG)
+<img src="dietcoach.JPG" alt="Diet Coach" width="300"/>

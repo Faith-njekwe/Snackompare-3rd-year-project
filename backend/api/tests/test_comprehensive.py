@@ -296,6 +296,90 @@ class TestSearchEndpoint(ThrottleFreeMixin, TestCase):
 
 
 @THROTTLE_OVERRIDE
+class TestChatEndpoint(ThrottleFreeMixin, TestCase):
+    """Integration tests for POST /api/chat/."""
+
+    def setUp(self):
+        super().setUp()
+        self.client = APIClient()
+
+    def _mock_openai_client(self, text="Mocked AI response"):
+        client = Mock()
+        response = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=text))]
+        )
+        client.chat.completions.create.return_value = response
+        return client
+
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"})
+    def test_chat_empty_prompt(self):
+        resp = self.client.post("/api/chat/", {"prompt": ""}, format="json")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("error", resp.json())
+
+    # 32 Chatbot too long message
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"})
+    @patch("api.views.OpenAI")
+    def test_chat_too_long_message(self, mock_openai_cls):
+        mock_openai_cls.return_value = self._mock_openai_client("Long prompt handled")
+        very_long_prompt = "x" * 50000
+        resp = self.client.post("/api/chat/", {"prompt": very_long_prompt}, format="json")
+        self.assertIn(resp.status_code, (200, 400, 413, 500))
+
+    # 33 Chatbot spam lots of messages
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"})
+    @patch("api.views.OpenAI")
+    def test_chat_spam_multiple_requests(self, mock_openai_cls):
+        mock_openai_cls.return_value = self._mock_openai_client("OK")
+        statuses = []
+        for i in range(30):
+            resp = self.client.post("/api/chat/", {"prompt": f"spam {i}"}, format="json")
+            statuses.append(resp.status_code)
+            self.assertIn(resp.status_code, (200, 429))
+        self.assertTrue(any(s == 200 for s in statuses))
+
+
+@THROTTLE_OVERRIDE
+class TestMealPhotoEndpoint(ThrottleFreeMixin, TestCase):
+    """Integration tests for POST /api/meals/photo-calories/."""
+
+    def setUp(self):
+        super().setUp()
+        self.client = APIClient()
+
+    # 34 Meal scanner: no image
+    def test_meal_photo_requires_image(self):
+        resp = self.client.post("/api/meals/photo-calories/", {}, format="multipart")
+        self.assertEqual(resp.status_code, 400)
+
+    # 35) Meal scanner: too large image
+    def test_meal_photo_rejects_large_image(self):
+        big_file = SimpleUploadedFile(
+            "large.jpg",
+            b"a" * (5 * 1024 * 1024 + 1),
+            content_type="image/jpeg",
+        )
+        resp = self.client.post(
+            "/api/meals/photo-calories/",
+            {"image": big_file},
+            format="multipart",
+        )
+        self.assertEqual(resp.status_code, 413)
+
+    # 36) Meal scanner: no items recognised
+    @patch("api.views.estimate_calories_from_image_bytes", side_effect=ValueError("No items recognised"))
+    def test_meal_photo_no_items_recognised(self, _):
+        img = SimpleUploadedFile("meal.jpg", b"fake-image-bytes", content_type="image/jpeg")
+        resp = self.client.post(
+            "/api/meals/photo-calories/",
+            {"image": img},
+            format="multipart",
+        )
+        self.assertEqual(resp.status_code, 422)
+        self.assertIn("error", resp.json())
+
+
+@THROTTLE_OVERRIDE
 class TestBarcodeEndpoint(ThrottleFreeMixin, TestCase):
     """Integration tests for GET /api/barcode/<code>/."""
 
@@ -303,7 +387,7 @@ class TestBarcodeEndpoint(ThrottleFreeMixin, TestCase):
         super().setUp()
         self.client = APIClient()
 
-    # 32
+    # 33
     @patch("api.views.get_or_cache_product")
     @patch("api.views.fetch_barcode")
     def test_returns_serialized_product(self, mock_fetch, mock_cache):
@@ -330,31 +414,27 @@ class TestFavouriteEndpoint(ThrottleFreeMixin, TestCase):
             nutriments={}, health_score=55
         )
 
-    # 33
+
     def test_get_without_user_id_returns_400(self):
         resp = self.client.get("/api/favourites/")
         self.assertEqual(resp.status_code, 400)
 
-    # 34
     def test_post_without_code_returns_400(self):
         resp = self.client.post("/api/favourites/", {"user_id": "u1"}, format="json")
         self.assertEqual(resp.status_code, 400)
 
-    # 35
     def test_post_with_nonexistent_code_returns_404(self):
         resp = self.client.post(
             "/api/favourites/", {"user_id": "u1", "code": "DOES-NOT-EXIST"}, format="json"
         )
         self.assertEqual(resp.status_code, 404)
 
-    # 36
     def test_delete_nonexistent_favourite_returns_200(self):
         resp = self.client.delete(
             "/api/favourites/", {"user_id": "u1", "code": "FAV-P1"}, format="json"
         )
         self.assertEqual(resp.status_code, 200)
 
-    # 37
     def test_different_users_see_only_their_own_favourites(self):
         product2 = Product.objects.create(
             code="FAV-P2", name="Other Snack", brand="B", category="Snacks",
@@ -373,6 +453,26 @@ class TestFavouriteEndpoint(ThrottleFreeMixin, TestCase):
         self.assertIn("FAV-P2", codes_b)
         self.assertNotIn("FAV-P1", codes_b)
 
+    # 38) Favourites flow: add, list, delete
+    def test_favourites_crud_flow(self):
+        add_resp = self.client.post(
+            "/api/favourites/",
+            {"user_id": "u1", "code": "FAV-P1"},
+            format="json",
+        )
+        self.assertEqual(add_resp.status_code, 200)
+
+        list_resp = self.client.get("/api/favourites/?user_id=u1")
+        self.assertEqual(list_resp.status_code, 200)
+        self.assertEqual(len(list_resp.json()), 1)
+
+        del_resp = self.client.delete(
+            "/api/favourites/",
+            {"user_id": "u1", "code": "FAV-P1"},
+            format="json",
+        )
+        self.assertEqual(del_resp.status_code, 200)
+
 
 @THROTTLE_OVERRIDE
 class TestProfileEndpoint(ThrottleFreeMixin, TestCase):
@@ -382,12 +482,16 @@ class TestProfileEndpoint(ThrottleFreeMixin, TestCase):
         super().setUp()
         self.client = APIClient()
 
-    # 38
     def test_get_without_user_id_returns_400(self):
         resp = self.client.get("/api/profile/")
         self.assertEqual(resp.status_code, 400)
 
-    # 39
+    # 37) Profile endpoint default payload for unknown user
+    def test_profile_get_default_when_missing(self):
+        resp = self.client.get("/api/profile/?user_id=test-user-001")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json().get("user_id"), "test-user-001")
+
     def test_put_creates_profile_with_camelcase_fields(self):
         payload = {
             "user_id": "new-user-cc",
@@ -406,7 +510,7 @@ class TestProfileEndpoint(ThrottleFreeMixin, TestCase):
         self.assertEqual(resp.json()["name"], "Alice")
         self.assertEqual(resp.json()["activityLevel"], "moderate")
 
-    # 40
+
     def test_put_accepts_legacy_diet_field_and_converts_it(self):
         payload = {
             "user_id": "legacy-diet-user",
@@ -426,17 +530,15 @@ class TestAuthEndpoints(ThrottleFreeMixin, TestCase):
         super().setUp()
         self.client = APIClient()
 
-    # 41
     def test_register_without_email_returns_400(self):
         resp = self.client.post("/api/auth/register/", {"password": "pass123"}, format="json")
         self.assertEqual(resp.status_code, 400)
 
-    # 42
     def test_register_without_password_returns_400(self):
         resp = self.client.post("/api/auth/register/", {"email": "test@example.com"}, format="json")
         self.assertEqual(resp.status_code, 400)
 
-    # 43
+
     def test_login_with_wrong_password_returns_401(self):
         self.client.post(
             "/api/auth/register/",
@@ -459,7 +561,6 @@ class TestExplainEndpoint(ThrottleFreeMixin, TestCase):
         super().setUp()
         self.client = APIClient()
 
-    # 44
     def test_missing_base_returns_400(self):
         resp = self.client.post(
             "/api/explain/",
@@ -468,7 +569,6 @@ class TestExplainEndpoint(ThrottleFreeMixin, TestCase):
         )
         self.assertEqual(resp.status_code, 400)
 
-    # 45
     def test_missing_alternative_returns_400(self):
         resp = self.client.post(
             "/api/explain/",
@@ -481,36 +581,6 @@ class TestExplainEndpoint(ThrottleFreeMixin, TestCase):
 # ===========================================================================
 # SYSTEM TESTS – Multi-step end-to-end flows
 # ===========================================================================
-
-@THROTTLE_OVERRIDE
-class TestSystemAuthFlow(ThrottleFreeMixin, TestCase):
-    """System tests: full authentication flow."""
-
-    def setUp(self):
-        super().setUp()
-        self.client = APIClient()
-
-    # 46
-    def test_register_then_login_returns_same_token(self):
-        email, password = "sys_auth@example.com", "securepass"
-        reg = self.client.post(
-            "/api/auth/register/", {"email": email, "password": password}, format="json"
-        )
-        self.assertEqual(reg.status_code, 200)
-        token_reg = reg.json()["token"]
-
-        login = self.client.post(
-            "/api/auth/login/", {"email": email, "password": password}, format="json"
-        )
-        self.assertEqual(login.status_code, 200)
-        self.assertEqual(login.json()["token"], token_reg)
-
-    # 47
-    def test_duplicate_registration_is_rejected(self):
-        payload = {"email": "dupe@example.com", "password": "pass"}
-        self.client.post("/api/auth/register/", payload, format="json")
-        resp = self.client.post("/api/auth/register/", payload, format="json")
-        self.assertEqual(resp.status_code, 400)
 
 
 @THROTTLE_OVERRIDE

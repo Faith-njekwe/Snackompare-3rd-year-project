@@ -60,30 +60,62 @@ export async function searchProducts(query, pageSize = 10, page = 1) {
  * Get product by barcode
  * @param {string} barcode - Product barcode
  * @returns {Promise<Object|null>} Product data or null if not found
+ * @throws {Error} with message "SERVER_ERROR" if the API is unavailable
  */
 export async function getProductByBarcode(barcode) {
   if (!barcode) {
     return null;
   }
 
-  try {
-    const response = await fetch(`${BASE_URL}/api/v0/product/${barcode}.json`);
+  const MAX_ATTEMPTS = 2;
+  const TIMEOUT_MS = 8000;
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    try {
+      const response = await fetch(
+        `${BASE_URL}/api/v0/product/${barcode}.json`,
+        { signal: controller.signal }
+      );
+      clearTimeout(timer);
+
+      if (response.status >= 500) {
+        if (attempt < MAX_ATTEMPTS) {
+          await new Promise((r) => setTimeout(r, 800));
+          continue;
+        }
+        throw new Error("SERVER_ERROR");
+      }
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json();
+
+      if (data.status === 1 && data.product) {
+        return data.product;
+      }
+
+      return null;
+    } catch (error) {
+      clearTimeout(timer);
+      if (error.message === "SERVER_ERROR") throw error;
+      if (error.name === "AbortError") {
+        if (attempt < MAX_ATTEMPTS) {
+          await new Promise((r) => setTimeout(r, 800));
+          continue;
+        }
+        throw new Error("SERVER_ERROR");
+      }
+      console.error("Error fetching product by barcode:", error);
+      return null;
     }
-
-    const data = await response.json();
-
-    if (data.status === 1 && data.product) {
-      return data.product;
-    }
-
-    return null;
-  } catch (error) {
-    console.error("Error fetching product by barcode:", error);
-    return null;
   }
+
+  return null;
 }
 
 /**

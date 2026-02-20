@@ -24,11 +24,13 @@ export default function ScanScreen() {
   const [isScanning, setIsScanning] = useState(true);
   const [scannedCode, setScannedCode] = useState(null);
   const [isActive, setIsActive] = useState(true);
+  const isProcessing = useRef(false);
   const [product, setProduct] = useState(null);
   const [isLoadingProduct, setIsLoadingProduct] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [serverError, setServerError] = useState(false);
   const device = useCameraDevice("back");
 
   // Animations
@@ -88,6 +90,7 @@ export default function ScanScreen() {
   const fetchProductData = async (barcode) => {
     setIsLoadingProduct(true);
     setNotFound(false);
+    setServerError(false);
     try {
       const rawProduct = await getProductByBarcode(barcode);
       if (rawProduct) {
@@ -110,9 +113,12 @@ export default function ScanScreen() {
         Vibration.vibrate(100);
       }
     } catch (error) {
-      console.error("Error fetching product:", error);
       setProduct(null);
-      setNotFound(true);
+      if (error.message === "SERVER_ERROR") {
+        setServerError(true);
+      } else {
+        setNotFound(true);
+      }
     } finally {
       setIsLoadingProduct(false);
     }
@@ -131,9 +137,10 @@ export default function ScanScreen() {
   const codeScanner = useCodeScanner({
     codeTypes: ["qr", "ean-13", "ean-8", "code-128", "code-39", "upc-a", "upc-e"],
     onCodeScanned: (codes) => {
-      if (codes.length > 0 && isActive) {
+      if (codes.length > 0 && !isProcessing.current) {
         const code = codes[0];
         if (code.value) {
+          isProcessing.current = true;
           setIsActive(false);
           setScannedCode(code.value);
           setIsScanning(false);
@@ -142,10 +149,12 @@ export default function ScanScreen() {
           fetchProductData(code.value);
 
           setTimeout(() => {
+            isProcessing.current = false;
             setIsActive(true);
             setIsScanning(true);
             setScannedCode(null);
             setNotFound(false);
+            setServerError(false);
           }, 3000);
         }
       }
@@ -264,6 +273,12 @@ export default function ScanScreen() {
             <View style={styles.statusContainer}>
               <ActivityIndicator size="small" color={palette.accent} />
               <Text style={styles.statusText}>Looking up product...</Text>
+            </View>
+          ) : serverError ? (
+            <View style={styles.statusContainer}>
+              <Ionicons name="cloud-offline-outline" size={24} color={palette.warning} />
+              <Text style={styles.statusText}>Server busy</Text>
+              <Text style={styles.statusSubtext}>Scan again to retry</Text>
             </View>
           ) : notFound ? (
             <View style={styles.statusContainer}>

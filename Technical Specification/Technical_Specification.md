@@ -474,7 +474,7 @@ After user testing, we decided to implement some changes.
 User testing showed that users valued calorie tracking, meal scanning, and the chatbot, while also highlighting areas for improvement in usability and performance. Based on this feedback, we implemented changes to improve the meal scanner and significantly reduce loading times, resulting in a more efficient and user-friendly app.
 
 
-## 7. References
+## 8. References
 
 1. Openai (2026) OpenAI platform, OpenAI Platform. Available at: https://platform.openai.com/docs/overview (Accessed: 12 January 2026).
 

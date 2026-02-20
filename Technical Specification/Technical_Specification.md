@@ -391,6 +391,8 @@ End-to-end scoring sanity (healthy product scores higher than unhealthy product 
 
 **Note** - For more information on test please go the testing folder
 
+---
+
 ## 7. User Testing 
 
 For user testing we developed a questionairre. We first reviewed our notes from the User Interface Design and Implementation module for guidance and noted down the most important points. We prioritised usability and UX goals, made sure each question measured something meaningful, and related the questions to real tasks the users would perform.

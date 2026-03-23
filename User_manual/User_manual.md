@@ -78,7 +78,6 @@ Once a user presses on the search button, they can search for any product that t
 
 There's also a comparison feature which allows users to select 2 products and see a comprehensive AI comparison between them, and get a recommendation out of the two.
 
-<img src="images/compareproducts.JPG" alt="Compare Products" width="300"/>
 
 ---
 
@@ -105,6 +104,13 @@ Use this feature to log meals from images.
 5\. Add the result to calorie tracking page if desired.
 
 Each item will appear individually on the calorie counter page, where you can choose to keep or delete entries.
+
+<img src="images/Meal_scanner.png" alt="Meal Scanner" width="300"/>
+
+<img src="images/food_picture.png" alt="Food picture" width="300"/>
+
+<img src="images/scanner_results.png" alt="Meal scanner results" width="300"/>
+
 
 ---
 
